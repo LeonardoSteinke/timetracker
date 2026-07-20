@@ -1,0 +1,21 @@
+services:
+  app:
+    build: .
+    container_name: ${PROJECT_NAME:-timetracker}
+    restart: unless-stopped
+    expose:
+      - "3000"            # porta interna — nginx-proxy roteia pra cá (nunca publicada no host)
+    env_file:
+      - .env
+    environment:
+      - NODE_ENV=production
+      - PORT=3000
+    volumes:
+      - ./data:/app/data  # SQLite persistente (timetracker.db)
+    networks:
+      - proxy_net
+
+networks:
+  proxy_net:
+    external: true
+    name: media_server_media_net
