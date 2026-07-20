@@ -13,12 +13,14 @@ const REGISTRATION_CODE = process.env.REGISTRATION_CODE || '';
 const COOKIE = 'tt_session';
 const TOKEN_TTL = '30d';
 
-const isProd = process.env.NODE_ENV === 'production';
-function cookieOpts() {
+function cookieOpts(req) {
+  // secure conforme o protocolo original (req.secure lê X-Forwarded-Proto via
+  // trust proxy): HTTPS pelo Cloudflare Tunnel → cookie secure; HTTP na LAN/
+  // Tailscale (porta 80) → cookie não-secure, para o login funcionar nos dois.
   return {
     httpOnly: true,
     sameSite: 'lax',
-    secure: isProd,          // via Cloudflare Tunnel o tráfego chega em HTTPS
+    secure: !!req?.secure,
     maxAge: 30 * 24 * 60 * 60 * 1000,
     path: '/',
   };
@@ -83,7 +85,7 @@ router.post('/register', loginLimiter, (req, res) => {
     .run(info.lastInsertRowid, JSON.stringify(DEFAULT_SCHEDULE));
 
   const user = { id: info.lastInsertRowid, name };
-  res.cookie(COOKIE, sign(user), cookieOpts());
+  res.cookie(COOKIE, sign(user), cookieOpts(req));
   res.json({ id: user.id, name, username, is_admin: isFirst ? 1 : 0 });
 });
 
@@ -96,12 +98,12 @@ router.post('/login', loginLimiter, (req, res) => {
   if (!user || !bcrypt.compareSync(password, user.password_hash)) {
     return res.status(401).json({ error: 'usuário ou senha incorretos' });
   }
-  res.cookie(COOKIE, sign(user), cookieOpts());
+  res.cookie(COOKIE, sign(user), cookieOpts(req));
   res.json({ id: user.id, name: user.name, username: user.username, is_admin: user.is_admin });
 });
 
 router.post('/logout', (req, res) => {
-  res.clearCookie(COOKIE, { ...cookieOpts(), maxAge: undefined });
+  res.clearCookie(COOKIE, { ...cookieOpts(req), maxAge: undefined });
   res.json({ ok: true });
 });
 
