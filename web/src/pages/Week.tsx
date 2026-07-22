@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { api, WeekReport } from '../api';
-import { fmtMin, fmtSigned, WEEKDAYS, fmtDataCurta, dayjs, OVERRIDE_LABEL } from '../util';
+import { fmtMin, fmtSigned, fmtHora, WEEKDAYS, fmtDataCurta, dayjs, OVERRIDE_LABEL } from '../util';
 
 export default function Week() {
   const [report, setReport] = useState<WeekReport | null>(null);
@@ -82,6 +82,11 @@ export default function Week() {
                 <div className={`bar-worked ${d.balance >= 0 ? 'pos' : 'neg'}`} style={{ width: `${pct}%` }} />
               </div>
               <div className="wd-foot muted small">
+                {d.punches.length > 0 && (
+                  <span className="wd-span">
+                    {fmtHora(d.punches[0].ts)} → {d.open ? 'agora' : fmtHora(d.punches[d.punches.length - 1].ts)}
+                  </span>
+                )}
                 {fmtMin(d.workedMinutes)} de {fmtMin(d.expectedMinutes)}
                 {d.breakMinutes > 0 && ` · ${fmtMin(d.breakMinutes)} intervalo`}
               </div>

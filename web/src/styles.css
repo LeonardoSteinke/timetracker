@@ -406,6 +406,15 @@ select {
 .wd-foot {
   margin-top: 6px;
 }
+.wd-span {
+  color: var(--text);
+  font-variant-numeric: tabular-nums;
+  margin-right: 6px;
+}
+.wd-span::after {
+  content: ' ·';
+  color: var(--muted);
+}
 .live-dot {
   width: 8px;
   height: 8px;
@@ -735,6 +744,121 @@ select {
   font-size: 0.88rem;
   white-space: nowrap;
 }
+/* ─── Calendário ──────────────────────────────────────────────────────────── */
+.cal-nav {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 4px;
+}
+.cal-month {
+  font-weight: 700;
+  text-transform: capitalize;
+}
+.cal-card {
+  padding: 12px;
+}
+.cal-grid {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 4px;
+}
+.cal-head {
+  margin-bottom: 6px;
+}
+.cal-wd {
+  text-align: center;
+  font-size: 0.72rem;
+  font-weight: 600;
+  color: var(--muted);
+}
+.cal-cell {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+  aspect-ratio: 1;
+  border-radius: 10px;
+  border: 1px solid transparent;
+  background: var(--surface-2);
+  color: var(--text);
+  text-decoration: none;
+  overflow: hidden;
+}
+.cal-cell.outside {
+  opacity: 0.38;
+}
+.cal-cell.pos {
+  background: var(--green-bg);
+}
+.cal-cell.neg {
+  background: var(--red-bg);
+}
+.cal-cell.today {
+  border-color: var(--indigo);
+}
+.cal-num {
+  font-size: 0.9rem;
+  font-weight: 600;
+  line-height: 1;
+  font-variant-numeric: tabular-nums;
+}
+.cal-bal {
+  font-size: 0.6rem;
+  line-height: 1;
+  font-variant-numeric: tabular-nums;
+  color: var(--muted);
+}
+.cal-cell.pos .cal-bal {
+  color: var(--green);
+}
+.cal-cell.neg .cal-bal {
+  color: var(--red);
+}
+.cal-flag {
+  position: absolute;
+  top: 3px;
+  right: 3px;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--amber);
+}
+.cal-cell .live-dot {
+  position: absolute;
+  bottom: 3px;
+  right: 3px;
+}
+.cal-legend {
+  display: flex;
+  justify-content: center;
+  gap: 14px;
+}
+.cal-legend span {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+}
+.cal-legend .sw {
+  width: 10px;
+  height: 10px;
+  border-radius: 3px;
+}
+.cal-legend .sw.pos {
+  background: var(--green-bg);
+  border: 1px solid var(--green);
+}
+.cal-legend .sw.neg {
+  background: var(--red-bg);
+  border: 1px solid var(--red);
+}
+.cal-legend .sw.flag {
+  border-radius: 50%;
+  background: var(--amber);
+}
+
 .manual-punch {
   display: flex;
   align-items: center;
