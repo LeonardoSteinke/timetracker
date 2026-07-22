@@ -67,6 +67,65 @@ function HourMinInput({
   );
 }
 
+/** Fuso do aparelho, ou o de São Paulo se o navegador não disser. */
+function fusoDoAparelho(): string {
+  return Intl.DateTimeFormat().resolvedOptions().timeZone || 'America/Sao_Paulo';
+}
+
+/**
+ * Lista de fusos para o select. Os navegadores atuais sabem enumerar todos
+ * (`Intl.supportedValuesOf`); nos que não sabem, fica uma lista curta com os
+ * fusos do Brasil. O fuso do aparelho e o já salvo entram sempre, mesmo que
+ * venham de fora da lista.
+ */
+function listaDeFusos(atual: string): string[] {
+  const suportados = (Intl as { supportedValuesOf?: (k: string) => string[] }).supportedValuesOf;
+  const todos = suportados
+    ? suportados('timeZone')
+    : [
+        'America/Sao_Paulo', 'America/Bahia', 'America/Fortaleza', 'America/Recife',
+        'America/Belem', 'America/Manaus', 'America/Cuiaba', 'America/Campo_Grande',
+        'America/Porto_Velho', 'America/Boa_Vista', 'America/Rio_Branco', 'America/Noronha',
+        'UTC',
+      ];
+  return [...new Set([atual, fusoDoAparelho(), ...todos])].filter(Boolean);
+}
+
+/**
+ * O fuso decide a que dia pertence cada ponto, então mudá-lo recalcula o
+ * histórico inteiro — por isso ele é escolhido de propósito num select, e não
+ * pego do aparelho a cada abertura (uma viagem viraria remanejamento de dias).
+ * O que o app faz é avisar quando os dois divergem e oferecer o ajuste.
+ */
+function TimezoneField({ value, onChange }: { value: string; onChange: (tz: string) => void }) {
+  const doAparelho = fusoDoAparelho();
+  const fusos = listaDeFusos(value);
+
+  return (
+    <>
+      <label className="field">
+        Fuso horário
+        <select value={value} onChange={(e) => onChange(e.target.value)}>
+          {fusos.map((tz) => (
+            <option key={tz} value={tz}>
+              {tz.replace(/_/g, ' ')}
+              {tz === doAparelho ? ' — deste aparelho' : ''}
+            </option>
+          ))}
+        </select>
+      </label>
+      {value !== doAparelho && (
+        <p className="muted small">
+          Este aparelho está em {doAparelho.replace(/_/g, ' ')}.{' '}
+          <button className="link-btn" type="button" onClick={() => onChange(doAparelho)}>
+            usar esse fuso
+          </button>
+        </p>
+      )}
+    </>
+  );
+}
+
 export default function Settings() {
   const [s, setS] = useState<TSettings | null>(null);
   const [saved, setSaved] = useState(false);
@@ -158,10 +217,7 @@ export default function Settings() {
 
       <section className="card">
         <h3>Preferências</h3>
-        <label className="field">
-          Fuso horário
-          <input value={s.timezone} onChange={(e) => setS({ ...s, timezone: e.target.value })} />
-        </label>
+        <TimezoneField value={s.timezone} onChange={(tz) => setS({ ...s, timezone: tz })} />
         <label className="field">
           Início da semana
           <select

@@ -11,6 +11,16 @@ router.get('/', (req, res) => {
   res.json(getSettings(req.user.id));
 });
 
+/** Fuso que o Intl aceita — um valor inválido quebraria todo cálculo de data. */
+function fusoValido(tz) {
+  try {
+    new Intl.DateTimeFormat('en-CA', { timeZone: tz });
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 const daySchema = z.object({
   expected: z.number().int().min(0).max(1440),
   break: z.number().int().min(0).max(1440),
@@ -19,7 +29,7 @@ const daySchema = z.object({
 router.put('/', (req, res) => {
   const schema = z.object({
     tolerance_minutes: z.number().int().min(0).max(240),
-    timezone: z.string().min(1).max(64),
+    timezone: z.string().min(1).max(64).refine(fusoValido, 'fuso horário inválido'),
     week_start: z.union([z.literal(0), z.literal(1)]),
     // 0 = sem checagem de intervalo mínimo
     min_break_minutes: z.number().int().min(0).max(480).optional(),
