@@ -1,4 +1,4 @@
-import { FormEvent, useEffect, useState } from 'react';
+import { FormEvent, useEffect, useMemo, useState } from 'react';
 import { api, Settings as TSettings } from '../api';
 import { useInstall } from '../install';
 import { WEEKDAYS_LONG } from '../util';
@@ -92,6 +92,25 @@ function listaDeFusos(atual: string): string[] {
 }
 
 /**
+ * Diferença do fuso para o UTC agora, como "UTC−03:00". Vem do próprio Intl
+ * (`longOffset` devolve "GMT-03:00"), então já sai com o horário de verão que
+ * estiver valendo hoje naquele fuso.
+ */
+function offsetUtc(tz: string, quando: Date): string {
+  try {
+    const nome = new Intl.DateTimeFormat('en-US', { timeZone: tz, timeZoneName: 'longOffset' })
+      .formatToParts(quando)
+      .find((p) => p.type === 'timeZoneName')?.value;
+    if (!nome) return '';
+    // "GMT" puro é o próprio UTC; o resto vira "UTC±HH:MM" com o sinal de menos
+    const resto = nome.replace('GMT', '') || '+00:00';
+    return `UTC${resto.replace('-', '−')}`;
+  } catch {
+    return '';
+  }
+}
+
+/**
  * O fuso decide a que dia pertence cada ponto, então mudá-lo recalcula o
  * histórico inteiro — por isso ele é escolhido de propósito num select, e não
  * pego do aparelho a cada abertura (uma viagem viraria remanejamento de dias).
@@ -99,16 +118,21 @@ function listaDeFusos(atual: string): string[] {
  */
 function TimezoneField({ value, onChange }: { value: string; onChange: (tz: string) => void }) {
   const doAparelho = fusoDoAparelho();
-  const fusos = listaDeFusos(value);
+  // são centenas de fusos e cada rótulo custa um formatToParts: calcula uma vez
+  const opcoes = useMemo(() => {
+    const agora = new Date();
+    return listaDeFusos(value).map((tz) => ({ tz, offset: offsetUtc(tz, agora) }));
+  }, [value]);
 
   return (
     <>
       <label className="field">
         Fuso horário
         <select value={value} onChange={(e) => onChange(e.target.value)}>
-          {fusos.map((tz) => (
+          {opcoes.map(({ tz, offset }) => (
             <option key={tz} value={tz}>
               {tz.replace(/_/g, ' ')}
+              {offset && ` (${offset})`}
               {tz === doAparelho ? ' — deste aparelho' : ''}
             </option>
           ))}
