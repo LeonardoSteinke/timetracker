@@ -38,21 +38,33 @@ router.get('/today', (req, res) => {
  * Registra um ponto no instante atual, num ISO informado ou em data+hora
  * locais. O tipo não vem do cliente: entrada e saída se alternam pela ordem dos
  * horários do dia, então quem decide é a `normalizeDay`.
+ *
+ * `clientId` (opcional) vem da fila offline do app: reenviar o mesmo ponto
+ * devolve o registro já gravado em vez de duplicá-lo.
  */
 router.post('/', (req, res) => {
   const schema = z.object({
     ts: z.string().datetime().optional(),
     note: z.string().max(200).optional(),
+    clientId: z.string().min(8).max(64).optional(),
     ...localTimeFields,
   });
   const parsed = schema.safeParse(req.body);
   if (!parsed.success) return res.status(400).json({ error: 'dados inválidos' });
 
+  const clientId = parsed.data.clientId || null;
+  if (clientId) {
+    const existente = db
+      .prepare('SELECT id, ts, kind FROM punches WHERE user_id = ? AND client_id = ?')
+      .get(req.user.id, clientId);
+    if (existente) return res.json({ ...existente, duplicate: true });
+  }
+
   const settings = getSettings(req.user.id);
   const ts = resolveTs(parsed.data, settings.timezone) || new Date().toISOString();
   const info = db
-    .prepare("INSERT INTO punches (user_id, ts, kind, note) VALUES (?,?,'clock_in',?)")
-    .run(req.user.id, ts, parsed.data.note || null);
+    .prepare("INSERT INTO punches (user_id, ts, kind, note, client_id) VALUES (?,?,'clock_in',?,?)")
+    .run(req.user.id, ts, parsed.data.note || null, clientId);
 
   normalizeDay(req.user.id, localDateKey(ts, settings.timezone), settings.timezone);
   const { kind } = db.prepare('SELECT kind FROM punches WHERE id = ?').get(info.lastInsertRowid);

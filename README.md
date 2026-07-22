@@ -43,6 +43,10 @@ jornada especial com os minutos na mão.
 previsto e saldo por dia. Separador `;` e BOM, para abrir direto no Excel em
 português.
 
+**Funciona sem internet** — instalado como PWA, o app abre e deixa bater o ponto
+mesmo offline: o registro fica numa fila local e sobe sozinho quando a conexão
+volta. Reenvio não duplica nada (cada ponto leva um id gerado no cliente).
+
 **Multiusuário** — cada pessoa tem seus próprios registros, jornada e fuso.
 Cadastro protegido por código de convite.
 
@@ -192,6 +196,7 @@ server/
 web/src/
   pages/            Dashboard, Week, History, DayEditor, Settings, Login
   api.ts            cliente HTTP e tipos compartilhados
+  offline.ts        fila de pontos e retrato do dia para uso sem conexão
 ```
 
 ### API
@@ -203,7 +208,7 @@ Todas as rotas exigem o cookie de sessão, exceto cadastro e login.
 | `POST` | `/api/auth/register` | Cadastro (exige o código de convite) |
 | `POST` | `/api/auth/login` | Login |
 | `GET` | `/api/punches/today` | Estado atual e resumo de hoje |
-| `POST` | `/api/punches` | Registra ponto (agora, ISO, ou `date`+`time`) |
+| `POST` | `/api/punches` | Registra ponto (agora, ISO, ou `date`+`time`; `clientId` torna o envio idempotente) |
 | `PATCH` | `/api/punches/:id` | Corrige horário, tipo ou observação |
 | `DELETE` | `/api/punches/:id` | Remove um ponto |
 | `GET` | `/api/reports/day?date=` | Detalhe de um dia, com horas locais |

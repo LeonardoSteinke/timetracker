@@ -36,8 +36,19 @@ export type User = { id: number; name: string; username: string; is_admin: numbe
 
 /** Entrada e saída se alternam pela ordem do dia — o servidor é quem decide. */
 export type PunchKind = 'clock_in' | 'clock_out';
-/** `time` ('HH:MM' no fuso do usuário) só vem no endpoint /api/reports/day. */
-export type Punch = { id: number; ts: string; kind: PunchKind; note?: string | null; time?: string };
+/**
+ * `time` ('HH:MM' no fuso do usuário) só vem no endpoint /api/reports/day.
+ * `pending` marca o ponto que ainda está na fila offline (id local, negativo).
+ */
+export type Punch = {
+  id: number;
+  ts: string;
+  kind: PunchKind;
+  note?: string | null;
+  time?: string;
+  pending?: boolean;
+  clientId?: string;
+};
 
 export type OverrideKind = 'holiday' | 'vacation' | 'sick' | 'dayoff' | 'custom';
 export type DayOverride = {

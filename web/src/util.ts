@@ -52,6 +52,42 @@ export function horaNoFuso(iso: string, timezone: string): string {
   }).format(new Date(iso));
 }
 
+/** 'YYYY-MM-DD' do instante no fuso do usuário. */
+export function dataNoFuso(iso: string, timezone: string): string {
+  return new Intl.DateTimeFormat('en-CA', {
+    timeZone: timezone,
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+  }).format(new Date(iso));
+}
+
+/** Quanto o fuso está adiantado em relação ao UTC naquele instante, em ms. */
+function offsetNoFuso(ms: number, timezone: string): number {
+  const parts = new Intl.DateTimeFormat('en-US', {
+    timeZone: timezone,
+    hour12: false,
+    year: 'numeric', month: '2-digit', day: '2-digit',
+    hour: '2-digit', minute: '2-digit', second: '2-digit',
+  }).formatToParts(new Date(ms));
+  const n = (t: string) => Number(parts.find((p) => p.type === t)!.value);
+  // hour vem como 24 à meia-noite em alguns runtimes
+  const comoUtc = Date.UTC(n('year'), n('month') - 1, n('day'), n('hour') % 24, n('minute'), n('second'));
+  return comoUtc - Math.floor(ms / 1000) * 1000;
+}
+
+/**
+ * 'YYYY-MM-DD' + 'HH:MM' locais → instante ISO em UTC. Mesma conta do
+ * `isoFromLocal` do servidor, refeita aqui porque a fila offline precisa saber
+ * o instante do ponto sem poder perguntar para ninguém.
+ */
+export function isoFromLocal(date: string, time: string, timezone: string): string {
+  const chute = Date.parse(`${date}T${time}:00Z`);
+  // duas passadas: a primeira erra em cima de mudanças de horário de verão
+  const off = offsetNoFuso(chute - offsetNoFuso(chute, timezone), timezone);
+  return new Date(chute - off).toISOString();
+}
+
 export function fmtDataCurta(dateKey: string): string {
   return dayjs(dateKey).format('DD/MM');
 }

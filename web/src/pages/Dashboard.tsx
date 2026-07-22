@@ -1,7 +1,20 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { api, Punch, PunchKind, TodayResponse } from '../api';
 import { useAuth } from '../auth';
-import { fmtClock, fmtHora, fmtMin, fmtSigned, fmtDataLonga, horaNoFuso } from '../util';
+import {
+  cacheToday,
+  descartar,
+  enfileirar,
+  enviarFila,
+  getCachedToday,
+  getFila,
+  isNetworkError,
+  juntarPendentes,
+  startSync,
+  subscribe,
+  subscribeOnline,
+} from '../offline';
+import { fmtClock, fmtHora, fmtMin, fmtSigned, fmtDataLonga, horaNoFuso, isoFromLocal } from '../util';
 
 type LiveState = 'off' | 'working';
 
@@ -44,19 +57,52 @@ export default function Dashboard() {
   // Ponto pendente de confirmação: o popup deixa ajustar a hora antes de gravar.
   const [pending, setPending] = useState<PunchKind | null>(null);
   const [pendingTime, setPendingTime] = useState('');
+  // Sem servidor: os números da tela vêm do último retrato + fila local.
+  const [semRede, setSemRede] = useState(false);
+  const [fila, setFila] = useState(() => getFila(user?.id));
   const tick = useRef<number>();
 
   const load = useCallback(async () => {
     try {
-      setData(await api.get<TodayResponse>('/api/punches/today'));
+      const fresco = await api.get<TodayResponse>('/api/punches/today');
+      cacheToday(fresco);
+      setData(fresco);
+      setSemRede(false);
+      setError('');
     } catch (e) {
-      setError((e as Error).message);
+      if (!isNetworkError(e)) {
+        setError((e as Error).message);
+        return;
+      }
+      setSemRede(true);
+      setData((atual) => getCachedToday() ?? atual);
     }
   }, []);
 
   useEffect(() => {
     load();
   }, [load]);
+
+  // Fila local: redesenha quando um ponto entra ou sai dela.
+  useEffect(() => {
+    if (!user) return;
+    setFila(getFila(user.id));
+    return subscribe(() => setFila(getFila(user.id)));
+  }, [user]);
+
+  // Volta a rede (ou o app volta ao primeiro plano) → sobe a fila e recarrega.
+  useEffect(() => {
+    if (!user) return;
+    return startSync(user.id, load);
+  }, [user, load]);
+
+  useEffect(() => {
+    const aoVoltar = () => navigator.onLine && load();
+    window.addEventListener('online', aoVoltar);
+    return () => window.removeEventListener('online', aoVoltar);
+  }, [load]);
+
+  useEffect(() => subscribeOnline(() => setSemRede(!navigator.onLine)), []);
 
   useEffect(() => {
     tick.current = window.setInterval(() => setNow(Date.now()), 1000);
@@ -70,37 +116,54 @@ export default function Dashboard() {
     setPending(kind);
   }
 
+  /**
+   * O ponto sempre entra primeiro na fila local e só depois vai para o
+   * servidor: com conexão a diferença é de milissegundos, e sem conexão o
+   * registro não se perde. O `clientId` da fila impede duplicata no reenvio.
+   */
   async function confirmPunch() {
-    if (!pending || !data) return;
-    // Hora intocada → grava o instante exato (com segundos); ajustada → date+time.
+    if (!pending || !data || !user) return;
+    // Hora intocada → instante exato (com segundos); ajustada → hora escolhida.
     const agora = horaNoFuso(new Date().toISOString(), data.timezone);
-    const body = pendingTime === agora ? {} : { date: data.today.date, time: pendingTime };
+    const ts =
+      pendingTime === agora
+        ? new Date().toISOString()
+        : isoFromLocal(data.today.date, pendingTime, data.timezone);
 
     setBusy(true);
     setError('');
     try {
-      await api.post('/api/punches', body);
+      enfileirar(user.id, ts);
       setPending(null);
+      await enviarFila(user.id);
       await load();
-    } catch (e) {
-      setError((e as Error).message);
     } finally {
       setBusy(false);
     }
   }
 
   if (!data) {
-    return (
+    return semRede ? (
+      <div className="center-screen">
+        <p className="muted center">
+          Sem conexão e sem dados guardados neste aparelho.
+          <br />
+          Abra o app uma vez com internet para poder usá-lo offline.
+        </p>
+      </div>
+    ) : (
       <div className="center-screen">
         <div className="spinner" />
       </div>
     );
   }
 
-  const punches = data.today.punches;
+  const view = juntarPendentes(data, fila);
+  const punches = view.today.punches;
+  const naFila = fila.length;
   const live = liveCompute(punches, now);
   const workedMin = live.workedSec / 60;
-  const expected = data.today.expectedMinutes;
+  const expected = view.today.expectedMinutes;
   const remaining = Math.max(0, expected - workedMin);
   const dayBalance = workedMin - expected;
   const tol = 0; // saldo do dia exibido "cru"; tolerância aparece no total/relatórios
@@ -111,12 +174,24 @@ export default function Dashboard() {
       <header className="page-header">
         <div>
           <div className="hello">Olá, {user?.name.split(' ')[0]}</div>
-          <div className="muted small">{fmtDataLonga(data.today.date)}</div>
+          <div className="muted small">{fmtDataLonga(view.today.date)}</div>
         </div>
         <button className="link-btn" onClick={() => logout()}>
           Sair
         </button>
       </header>
+
+      {(semRede || naFila > 0) && (
+        <div className="offline-bar">
+          {semRede ? '📴 Sem conexão — o ponto é registrado aqui mesmo.' : '🔄 Enviando…'}
+          {naFila > 0 && (
+            <strong>
+              {' '}
+              {naFila} {naFila === 1 ? 'registro aguardando envio' : 'registros aguardando envio'}
+            </strong>
+          )}
+        </div>
+      )}
 
       <section className={`clock-card state-${live.state}`}>
         <div className="status-pill">{STATUS_LABEL[live.state]}</div>
@@ -161,7 +236,7 @@ export default function Dashboard() {
       {pending && (
         <ConfirmPunch
           kind={pending}
-          date={data.today.date}
+          date={view.today.date}
           time={pendingTime}
           busy={busy}
           onTime={setPendingTime}
@@ -175,7 +250,10 @@ export default function Dashboard() {
       <section className="card">
         <div className="card-title-row">
           <h3>Registros de hoje</h3>
-          <span className="badge">saldo total {fmtSigned(data.totalBalance)}</span>
+          <span className="badge" title={semRede ? 'último valor sincronizado' : undefined}>
+            saldo total {fmtSigned(view.totalBalance)}
+            {semRede && '*'}
+          </span>
         </div>
         {punches.length === 0 ? (
           <p className="muted">Nenhum registro ainda. Bata o ponto para começar.</p>
@@ -256,14 +334,24 @@ function PunchRow({ p, onChanged }: { p: Punch; onChanged: () => void }) {
   const meta = KIND_META[p.kind];
   async function del() {
     if (!confirm('Remover este registro?')) return;
-    await api.del(`/api/punches/${p.id}`);
-    onChanged();
+    // Ponto ainda na fila nunca chegou ao servidor: some tirando ele da fila.
+    if (p.pending && p.clientId) {
+      descartar(p.clientId);
+      return;
+    }
+    try {
+      await api.del(`/api/punches/${p.id}`);
+      onChanged();
+    } catch (e) {
+      alert(isNetworkError(e) ? 'Sem conexão: só dá para remover um ponto já sincronizado online.' : (e as Error).message);
+    }
   }
   return (
-    <li className="punch-row">
+    <li className={`punch-row${p.pending ? ' is-pending' : ''}`}>
       <span className={`dot ${meta.cls}`} />
       <span className="punch-label">{meta.label}</span>
       <span className="punch-time">{fmtHora(p.ts)}</span>
+      {p.pending && <span className="pending-tag" title="aguardando envio">⏳</span>}
       <button className="link-btn danger" onClick={del} aria-label="remover">
         ✕
       </button>

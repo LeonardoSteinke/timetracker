@@ -968,3 +968,19 @@ select {
   text-align: center;
 }
 
+/* ── Modo offline ────────────────────────────────────────────────────────── */
+.offline-bar {
+  background: var(--amber);
+  color: #fff;
+  border-radius: 12px;
+  padding: 10px 12px;
+  font-size: 13px;
+  line-height: 1.35;
+  margin-bottom: 12px;
+}
+.punch-row.is-pending {
+  opacity: 0.72;
+}
+.pending-tag {
+  font-size: 12px;
+}

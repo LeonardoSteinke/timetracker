@@ -49,6 +49,7 @@ db.exec(`
 
   CREATE INDEX IF NOT EXISTS idx_punches_user_ts ON punches(user_id, ts);
 
+
   -- Exceções de jornada: feriado, férias, atestado, folga ou jornada customizada
   -- num dia específico. Sobrepõe o schedule semanal no cálculo do previsto.
   CREATE TABLE IF NOT EXISTS day_overrides (
@@ -60,5 +61,16 @@ db.exec(`
     PRIMARY KEY (user_id, date)
   );
 `);
+
+// ── client_id: idempotência da fila offline ──────────────────────────────────
+// O app pode registrar pontos sem conexão e reenviá-los depois; se a resposta
+// se perder no caminho, o mesmo ponto chega duas vezes. O id gerado no cliente
+// deixa o INSERT idempotente (índice único; NULLs são distintos no SQLite, então
+// pontos criados online continuam podendo omitir o campo).
+const punchCols = db.prepare('PRAGMA table_info(punches)').all().map((c) => c.name);
+if (!punchCols.includes('client_id')) {
+  db.exec('ALTER TABLE punches ADD COLUMN client_id TEXT');
+}
+db.exec('CREATE UNIQUE INDEX IF NOT EXISTS idx_punches_client ON punches(user_id, client_id)');
 
 export default db;
