@@ -14,9 +14,14 @@ export const WEEKDAYS_LONG = [
   'Domingo', 'Segunda', 'Terça', 'Quarta', 'Quinta', 'Sexta', 'Sábado',
 ];
 
-/** Minutos → "1h30" (ou "0h00"). */
+/**
+ * Minutos → "1h30" (ou "0h00"). Trunca, não arredonda: nos contadores ao vivo o
+ * valor é fracionário, e arredondar virava o minuto aos 30s. O minuto só muda
+ * quando ele fecha de verdade — mesma regra dos pontos, gravados no minuto
+ * cheio. O epsilon protege de 89,9999… virar 89.
+ */
 export function fmtMin(min: number): string {
-  const a = Math.abs(Math.round(min));
+  const a = Math.floor(Math.abs(min) + 1e-9);
   const h = Math.floor(a / 60);
   const m = a % 60;
   return `${h}h${String(m).padStart(2, '0')}`;
@@ -24,7 +29,7 @@ export function fmtMin(min: number): string {
 
 /** Saldo com sinal: "+1h30" / "−0h45". */
 export function fmtSigned(min: number): string {
-  const r = Math.round(min);
+  const r = Math.trunc(min + Math.sign(min) * 1e-9);
   if (r === 0) return '0h00';
   return (r > 0 ? '+' : '−') + fmtMin(r);
 }
