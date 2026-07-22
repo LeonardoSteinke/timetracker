@@ -3,6 +3,13 @@ import 'dayjs/locale/pt-br';
 dayjs.locale('pt-br');
 
 export const WEEKDAYS = ['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb'];
+export const OVERRIDE_LABEL: Record<string, string> = {
+  holiday: 'Feriado',
+  vacation: 'Férias',
+  sick: 'Atestado',
+  dayoff: 'Folga',
+  custom: 'Especial',
+};
 export const WEEKDAYS_LONG = [
   'Domingo', 'Segunda', 'Terça', 'Quarta', 'Quinta', 'Sexta', 'Sábado',
 ];

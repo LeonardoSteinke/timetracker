@@ -14,6 +14,46 @@ export function localDateKey(iso, timezone) {
   }).format(d);
 }
 
+/** Hora local 'HH:MM' de um instante ISO num dado fuso. */
+export function localTimeKey(iso, timezone) {
+  return new Intl.DateTimeFormat('en-GB', {
+    timeZone: timezone,
+    hour: '2-digit',
+    minute: '2-digit',
+    hour12: false,
+  }).format(new Date(iso));
+}
+
+/** Offset do fuso (ms) vigente no instante `utcMs`. */
+function tzOffsetMs(utcMs, timezone) {
+  const parts = Object.fromEntries(
+    new Intl.DateTimeFormat('en-US', {
+      timeZone: timezone,
+      hour12: false,
+      year: 'numeric', month: '2-digit', day: '2-digit',
+      hour: '2-digit', minute: '2-digit', second: '2-digit',
+    })
+      .formatToParts(new Date(utcMs))
+      .map((p) => [p.type, p.value])
+  );
+  const hour = Number(parts.hour) % 24; // en-US pode devolver "24" para meia-noite
+  const asUtc = Date.UTC(+parts.year, +parts.month - 1, +parts.day, hour, +parts.minute, +parts.second);
+  return asUtc - utcMs;
+}
+
+/**
+ * Converte data + hora locais ('YYYY-MM-DD', 'HH:MM') num fuso para ISO UTC.
+ * Duas passadas para acertar as bordas de horário de verão.
+ */
+export function isoFromLocal(dateKey, hhmm, timezone) {
+  const [y, mo, d] = dateKey.split('-').map(Number);
+  const [h, mi] = hhmm.split(':').map(Number);
+  const naive = Date.UTC(y, mo - 1, d, h, mi, 0, 0);
+  let ts = naive - tzOffsetMs(naive, timezone);
+  ts = naive - tzOffsetMs(ts, timezone);
+  return new Date(ts).toISOString();
+}
+
 /** Dia da semana (0=domingo … 6=sábado) de uma data 'YYYY-MM-DD'. */
 export function weekdayOf(dateKey) {
   // meia-noite UTC do dia — só usamos o índice do dia da semana

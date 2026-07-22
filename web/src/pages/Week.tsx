@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
+import { Link } from 'react-router-dom';
 import { api, WeekReport } from '../api';
-import { fmtMin, fmtSigned, WEEKDAYS, fmtDataCurta, dayjs } from '../util';
+import { fmtMin, fmtSigned, WEEKDAYS, fmtDataCurta, dayjs, OVERRIDE_LABEL } from '../util';
 
 export default function Week() {
   const [report, setReport] = useState<WeekReport | null>(null);
@@ -65,11 +66,12 @@ export default function Week() {
           const expPct = Math.min(100, (d.expectedMinutes / maxExpected) * 100);
           const isToday = d.date === dayjs().format('YYYY-MM-DD');
           return (
-            <div key={d.date} className={`week-day ${isToday ? 'today' : ''}`}>
+            <Link key={d.date} to={`/dia/${d.date}`} className={`week-day ${isToday ? 'today' : ''}`}>
               <div className="wd-head">
                 <span className="wd-name">
                   {WEEKDAYS[d.weekday]} {fmtDataCurta(d.date)}
                   {d.open && <span className="live-dot" title="em andamento" />}
+                  {d.override && <span className="tag">{OVERRIDE_LABEL[d.override.kind]}</span>}
                 </span>
                 <span className={`wd-balance ${d.balance >= 0 ? 'pos' : 'neg'}`}>
                   {d.expectedMinutes > 0 || d.workedMinutes > 0 ? fmtSigned(d.balance) : '—'}
@@ -83,7 +85,7 @@ export default function Week() {
                 {fmtMin(d.workedMinutes)} de {fmtMin(d.expectedMinutes)}
                 {d.breakMinutes > 0 && ` · ${fmtMin(d.breakMinutes)} intervalo`}
               </div>
-            </div>
+            </Link>
           );
         })}
       </section>

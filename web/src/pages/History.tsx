@@ -1,6 +1,7 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
+import { Link } from 'react-router-dom';
 import { api, RangeReport } from '../api';
-import { fmtMin, fmtSigned, WEEKDAYS, fmtDataCurta, dayjs } from '../util';
+import { fmtMin, fmtSigned, WEEKDAYS, fmtDataCurta, dayjs, OVERRIDE_LABEL } from '../util';
 
 type Preset = 7 | 30 | 90;
 
@@ -10,14 +11,20 @@ export default function History() {
   const [total, setTotal] = useState<number | null>(null);
   const [error, setError] = useState('');
 
+  const range = useMemo(
+    () => ({
+      to: dayjs().format('YYYY-MM-DD'),
+      from: dayjs().subtract(preset - 1, 'day').format('YYYY-MM-DD'),
+    }),
+    [preset]
+  );
+
   useEffect(() => {
-    const to = dayjs().format('YYYY-MM-DD');
-    const from = dayjs().subtract(preset - 1, 'day').format('YYYY-MM-DD');
     api
-      .get<RangeReport>(`/api/reports/range?from=${from}&to=${to}`)
+      .get<RangeReport>(`/api/reports/range?from=${range.from}&to=${range.to}`)
       .then(setReport)
       .catch((e) => setError((e as Error).message));
-  }, [preset]);
+  }, [range]);
 
   useEffect(() => {
     api.get<{ totalBalance: number }>('/api/reports/total').then((r) => setTotal(r.totalBalance));
@@ -69,10 +76,10 @@ export default function History() {
 
           <section className="hist-list card">
             {[...report.days]
-              .filter((d) => d.punches.length > 0 || d.expectedMinutes > 0)
+              .filter((d) => d.punches.length > 0 || d.expectedMinutes > 0 || d.override)
               .reverse()
               .map((d) => (
-                <div key={d.date} className="hist-row">
+                <Link key={d.date} to={`/dia/${d.date}`} className="hist-row">
                   <div className="hist-date">
                     <span className="hist-wd">{WEEKDAYS[d.weekday]}</span>
                     <span className="muted small">{fmtDataCurta(d.date)}</span>
@@ -80,13 +87,18 @@ export default function History() {
                   <div className="hist-mid">
                     <span>{fmtMin(d.workedMinutes)}</span>
                     <span className="muted small">/ {fmtMin(d.expectedMinutes)}</span>
+                    {d.override && <span className="tag">{OVERRIDE_LABEL[d.override.kind]}</span>}
                   </div>
                   <span className={`hist-bal ${d.balance >= 0 ? 'pos' : 'neg'}`}>
                     {d.expectedMinutes > 0 || d.workedMinutes > 0 ? fmtSigned(d.balance) : '—'}
                   </span>
-                </div>
+                </Link>
               ))}
           </section>
+
+          <a className="btn-secondary export-btn" href={`/api/reports/export.csv?from=${range.from}&to=${range.to}`}>
+            ⤓ Exportar CSV ({preset} dias)
+          </a>
         </>
       )}
 

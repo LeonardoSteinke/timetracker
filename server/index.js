@@ -8,6 +8,7 @@ import authRouter from './auth.js';
 import punchesRouter from './routes/punches.js';
 import settingsRouter from './routes/settings.js';
 import reportsRouter from './routes/reports.js';
+import overridesRouter from './routes/overrides.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const app = express();
@@ -31,6 +32,7 @@ app.use('/api/auth', authRouter);
 app.use('/api/punches', punchesRouter);
 app.use('/api/settings', settingsRouter);
 app.use('/api/reports', reportsRouter);
+app.use('/api/overrides', overridesRouter);
 
 // ── Frontend (build do Vite) ──────────────────────────────────────────────
 const webDir = path.join(__dirname, 'web', 'dist');

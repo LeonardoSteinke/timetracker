@@ -4,6 +4,7 @@ import Login from './pages/Login';
 import Dashboard from './pages/Dashboard';
 import Week from './pages/Week';
 import History from './pages/History';
+import DayEditor from './pages/DayEditor';
 import Settings from './pages/Settings';
 
 function BottomNav() {
@@ -45,6 +46,7 @@ export default function App() {
           <Route path="/" element={<Dashboard />} />
           <Route path="/semana" element={<Week />} />
           <Route path="/historico" element={<History />} />
+          <Route path="/dia/:date" element={<DayEditor />} />
           <Route path="/config" element={<Settings />} />
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>

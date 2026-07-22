@@ -48,6 +48,17 @@ db.exec(`
   );
 
   CREATE INDEX IF NOT EXISTS idx_punches_user_ts ON punches(user_id, ts);
+
+  -- Exceções de jornada: feriado, férias, atestado, folga ou jornada customizada
+  -- num dia específico. Sobrepõe o schedule semanal no cálculo do previsto.
+  CREATE TABLE IF NOT EXISTS day_overrides (
+    user_id  INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    date     TEXT NOT NULL,                          -- 'YYYY-MM-DD' local
+    kind     TEXT NOT NULL CHECK (kind IN ('holiday','vacation','sick','dayoff','custom')),
+    expected INTEGER,                                -- só para kind='custom' (minutos)
+    note     TEXT,
+    PRIMARY KEY (user_id, date)
+  );
 `);
 
 export default db;

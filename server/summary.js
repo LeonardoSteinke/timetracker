@@ -21,10 +21,28 @@ export function getSettings(userId) {
   return { ...row, schedule };
 }
 
-function expectedFor(dateKey, settings) {
+function scheduledFor(dateKey, settings) {
   const wd = weekdayOf(dateKey);
   const day = settings.schedule[wd] || settings.schedule[String(wd)] || { expected: 0 };
   return day.expected || 0;
+}
+
+/**
+ * Previsto do dia considerando exceções. Feriado/férias/atestado/folga zeram a
+ * jornada; 'custom' define os minutos à mão.
+ */
+function expectedFor(dateKey, settings, override) {
+  if (!override) return scheduledFor(dateKey, settings);
+  if (override.kind === 'custom') return override.expected ?? scheduledFor(dateKey, settings);
+  return 0;
+}
+
+/** Exceções do usuário entre duas datas, indexadas por 'YYYY-MM-DD'. */
+export function overridesInRange(userId, fromKey, toKey) {
+  const rows = db
+    .prepare('SELECT date, kind, expected, note FROM day_overrides WHERE user_id = ? AND date BETWEEN ? AND ?')
+    .all(userId, fromKey, toKey);
+  return new Map(rows.map((r) => [r.date, r]));
 }
 
 /** Adiciona/subtrai dias de uma chave 'YYYY-MM-DD' (UTC-safe). */
@@ -53,13 +71,15 @@ export function rangeSummaries(userId, fromKey, toKey, settings, nowIso) {
     byDay.get(key).push(p);
   }
 
+  const overrides = overridesInRange(userId, fromKey, toKey);
   const todayKey = localDateKey(nowIso, settings.timezone);
   const days = [];
   for (let key = fromKey; key <= toKey; key = addDays(key, 1)) {
     const punches = byDay.get(key) || [];
     const isToday = key === todayKey;
     const c = computeDay(punches, isToday ? nowIso : null);
-    const expected = expectedFor(key, settings);
+    const override = overrides.get(key) || null;
+    const expected = expectedFor(key, settings, override);
     const bal = dayBalance(c.workedMinutes, expected, settings.tolerance_minutes);
     days.push({
       date: key,
@@ -72,6 +92,7 @@ export function rangeSummaries(userId, fromKey, toKey, settings, nowIso) {
       rawBalance: bal.raw,
       open: c.open,
       state: c.state,
+      override,
       punches,
     });
   }

@@ -35,7 +35,16 @@ export const api = {
 export type User = { id: number; name: string; username: string; is_admin: number };
 
 export type PunchKind = 'clock_in' | 'clock_out' | 'break_start' | 'break_end';
-export type Punch = { id: number; ts: string; kind: PunchKind; note?: string | null };
+/** `time` ('HH:MM' no fuso do usuário) só vem no endpoint /api/reports/day. */
+export type Punch = { id: number; ts: string; kind: PunchKind; note?: string | null; time?: string };
+
+export type OverrideKind = 'holiday' | 'vacation' | 'sick' | 'dayoff' | 'custom';
+export type DayOverride = {
+  date: string;
+  kind: OverrideKind;
+  expected: number | null;
+  note: string | null;
+};
 
 export type DaySummary = {
   date: string;
@@ -48,8 +57,11 @@ export type DaySummary = {
   rawBalance: number;
   open: boolean;
   state: 'off' | 'working' | 'onbreak';
+  override: DayOverride | null;
   punches: Punch[];
 };
+
+export type DayResponse = { day: DaySummary; timezone: string; today: string };
 
 export type TodayResponse = {
   today: DaySummary;
