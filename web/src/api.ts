@@ -55,6 +55,8 @@ export type DaySummary = {
   remainingMinutes: number;
   balance: number;
   rawBalance: number;
+  /** false = fora da janela ativa (antes do 1º ponto ou no futuro): não gera saldo. */
+  counted: boolean;
   open: boolean;
   state: 'off' | 'working' | 'onbreak';
   override: DayOverride | null;

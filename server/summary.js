@@ -53,8 +53,22 @@ export function addDays(dateKey, n) {
 }
 
 /**
+ * Janela em que o banco de horas realmente conta: do primeiro ponto batido até
+ * hoje. Antes disso não havia registro; depois, o dia ainda não aconteceu — em
+ * nenhum dos dois casos faz sentido gerar saldo negativo.
+ */
+export function activeWindow(userId, settings, nowIso) {
+  const first = db.prepare('SELECT MIN(ts) AS m FROM punches WHERE user_id = ?').get(userId);
+  return {
+    start: first?.m ? localDateKey(first.m, settings.timezone) : null,
+    end: localDateKey(nowIso, settings.timezone),
+  };
+}
+
+/**
  * Agrupa os punches do usuário por dia local e devolve o resumo de cada dia
  * entre fromKey e toKey (inclusive). Sessão aberta do dia atual conta até agora.
+ * Dias fora da janela ativa vêm com `counted: false` e saldo/previsto zerados.
  */
 export function rangeSummaries(userId, fromKey, toKey, settings, nowIso) {
   // janela UTC com folga de 1 dia em cada ponta (cobre diferença de fuso)
@@ -73,14 +87,19 @@ export function rangeSummaries(userId, fromKey, toKey, settings, nowIso) {
 
   const overrides = overridesInRange(userId, fromKey, toKey);
   const todayKey = localDateKey(nowIso, settings.timezone);
+  const win = activeWindow(userId, settings, nowIso);
   const days = [];
   for (let key = fromKey; key <= toKey; key = addDays(key, 1)) {
     const punches = byDay.get(key) || [];
     const isToday = key === todayKey;
     const c = computeDay(punches, isToday ? nowIso : null);
     const override = overrides.get(key) || null;
-    const expected = expectedFor(key, settings, override);
-    const bal = dayBalance(c.workedMinutes, expected, settings.tolerance_minutes);
+    // fora da janela ativa o dia é só informativo: não cobra jornada nem gera saldo
+    const counted = win.start != null && key >= win.start && key <= win.end;
+    const expected = counted ? expectedFor(key, settings, override) : 0;
+    const bal = counted
+      ? dayBalance(c.workedMinutes, expected, settings.tolerance_minutes)
+      : { raw: 0, effective: 0 };
     days.push({
       date: key,
       weekday: weekdayOf(key),
@@ -90,6 +109,7 @@ export function rangeSummaries(userId, fromKey, toKey, settings, nowIso) {
       remainingMinutes: Math.max(0, expected - c.workedMinutes),
       balance: bal.effective,
       rawBalance: bal.raw,
+      counted,
       open: c.open,
       state: c.state,
       override,
@@ -101,11 +121,9 @@ export function rangeSummaries(userId, fromKey, toKey, settings, nowIso) {
 
 /** Saldo total acumulado do banco de horas (todos os dias com registros). */
 export function totalBalance(userId, settings, nowIso) {
-  const first = db.prepare('SELECT MIN(ts) AS m FROM punches WHERE user_id = ?').get(userId);
-  if (!first?.m) return { totalBalance: 0, days: 0 };
-  const fromKey = localDateKey(first.m, settings.timezone);
-  const toKey = localDateKey(nowIso, settings.timezone);
-  const days = rangeSummaries(userId, fromKey, toKey, settings, nowIso);
+  const win = activeWindow(userId, settings, nowIso);
+  if (!win.start) return { totalBalance: 0, days: 0 };
+  const days = rangeSummaries(userId, win.start, win.end, settings, nowIso);
   let total = 0;
   let counted = 0;
   for (const d of days) {

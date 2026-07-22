@@ -1,7 +1,9 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { api, DaySummary, RangeReport, Settings } from '../api';
-import { fmtMin, fmtSigned, WEEKDAYS, fmtDataCurta, dayjs, OVERRIDE_LABEL } from '../util';
+import { api, DaySummary, OverrideKind, RangeReport, Settings } from '../api';
+import { fmtMin, fmtSigned, WEEKDAYS, fmtDataCurta, fmtDataLonga, dayjs, OVERRIDE_LABEL } from '../util';
+
+const OVERRIDE_KINDS: OverrideKind[] = ['vacation', 'dayoff', 'holiday', 'sick', 'custom'];
 
 type Preset = 7 | 30 | 90;
 type View = 'lista' | 'calendario';
@@ -147,6 +149,153 @@ function ListView() {
   );
 }
 
+// ─── Exceção em período (férias, folga emendada, atestado) ───────────────────
+
+function PeriodOverride({ defaultFrom, onDone }: { defaultFrom: string; onDone: () => void }) {
+  const [open, setOpen] = useState(false);
+  const [kind, setKind] = useState<OverrideKind>('vacation');
+  const [from, setFrom] = useState(defaultFrom);
+  const [to, setTo] = useState(defaultFrom);
+  const [hours, setHours] = useState('4');
+  const [note, setNote] = useState('');
+  const [onlyWorkdays, setOnlyWorkdays] = useState(true);
+  const [busy, setBusy] = useState(false);
+  const [msg, setMsg] = useState('');
+  const [error, setError] = useState('');
+
+  const invalido = !from || !to || from > to;
+
+  async function run(fn: () => Promise<{ days: number }>, verbo: string) {
+    setBusy(true);
+    setError('');
+    setMsg('');
+    try {
+      const r = await fn();
+      setMsg(`${r.days} ${r.days === 1 ? 'dia' : 'dias'} ${verbo}.`);
+      onDone();
+    } catch (e) {
+      setError((e as Error).message);
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  if (!open) {
+    return (
+      <button className="btn-secondary export-btn" onClick={() => setOpen(true)}>
+        🏖 Registrar férias / folga em período
+      </button>
+    );
+  }
+
+  return (
+    <section className="card form">
+      <div className="card-title-row">
+        <h3>Exceção em período</h3>
+        <button className="link-btn" onClick={() => setOpen(false)}>
+          fechar
+        </button>
+      </div>
+      <p className="muted small">
+        Aplica a mesma exceção a todos os dias do intervalo — férias, folga emendada, atestado. Dias
+        futuros só passam a contar quando chegarem.
+      </p>
+
+      <label>
+        Tipo
+        <select value={kind} onChange={(e) => setKind(e.target.value as OverrideKind)} disabled={busy}>
+          {OVERRIDE_KINDS.map((k) => (
+            <option key={k} value={k}>
+              {OVERRIDE_LABEL[k]}
+            </option>
+          ))}
+        </select>
+      </label>
+
+      <div className="range-row">
+        <label>
+          De
+          <input type="date" value={from} onChange={(e) => setFrom(e.target.value)} disabled={busy} />
+        </label>
+        <label>
+          Até
+          <input type="date" value={to} onChange={(e) => setTo(e.target.value)} disabled={busy} />
+        </label>
+      </div>
+
+      {kind === 'custom' && (
+        <div className="hm-input">
+          <input
+            type="number"
+            min={0}
+            max={23}
+            value={hours}
+            onChange={(e) => setHours(e.target.value)}
+            disabled={busy}
+          />
+          <span>h previstas por dia</span>
+        </div>
+      )}
+
+      <label className="check-row">
+        <input
+          type="checkbox"
+          checked={onlyWorkdays}
+          onChange={(e) => setOnlyWorkdays(e.target.checked)}
+          disabled={busy}
+        />
+        Só nos dias com jornada prevista (pula fim de semana)
+      </label>
+
+      <label>
+        Observação
+        <input
+          value={note}
+          maxLength={200}
+          placeholder="ex.: férias 2026"
+          onChange={(e) => setNote(e.target.value)}
+          disabled={busy}
+        />
+      </label>
+
+      {msg && <div className="ok-msg">{msg}</div>}
+      {error && <div className="error">{error}</div>}
+
+      <button
+        className="btn-primary"
+        disabled={busy || invalido}
+        onClick={() =>
+          run(
+            () =>
+              api.put<{ days: number }>('/api/overrides/range', {
+                from,
+                to,
+                kind,
+                expected: kind === 'custom' ? Number(hours) * 60 : null,
+                note: note.trim() || null,
+                onlyWorkdays,
+              }),
+            'marcados'
+          )
+        }
+      >
+        Aplicar de {fmtDataLonga(from)} a {fmtDataLonga(to)}
+      </button>
+
+      <button
+        className="link-btn danger"
+        disabled={busy || invalido}
+        onClick={() =>
+          confirm('Remover todas as exceções desse período?') &&
+          run(() => api.del<{ days: number }>(`/api/overrides/range?from=${from}&to=${to}`), 'liberados')
+        }
+      >
+        Remover exceções do período
+      </button>
+    </section>
+  );
+}
+
 // ─── Visão calendário: grade do mês ──────────────────────────────────────────
 
 function CalendarView() {
@@ -171,13 +320,17 @@ function CalendarView() {
     return { start, cells, from: start.format('YYYY-MM-DD'), to: start.add(cells - 1, 'day').format('YYYY-MM-DD') };
   }, [month, weekStart]);
 
-  useEffect(() => {
-    setDays(null);
+  const load = useCallback(() => {
     api
       .get<RangeReport>(`/api/reports/range?from=${grid.from}&to=${grid.to}`)
       .then((r) => setDays(Object.fromEntries(r.days.map((d) => [d.date, d]))))
       .catch((e) => setError((e as Error).message));
   }, [grid.from, grid.to]);
+
+  useEffect(() => {
+    setDays(null);
+    load();
+  }, [load]);
 
   const monthFrom = month.format('YYYY-MM-DD');
   const monthTo = month.endOf('month').format('YYYY-MM-DD');
@@ -209,7 +362,9 @@ function CalendarView() {
             const d = grid.start.add(i, 'day');
             const key = d.format('YYYY-MM-DD');
             const day = days?.[key];
-            const vazio = !day || (day.workedMinutes === 0 && day.expectedMinutes === 0 && !day.override);
+            // dia fora da janela ativa (futuro / antes do 1º ponto) fica neutro
+            const vazio =
+              !day || !day.counted || (day.workedMinutes === 0 && day.expectedMinutes === 0 && !day.override);
             const cls = [
               'cal-cell',
               d.month() !== month.month() ? 'outside' : '',
@@ -248,6 +403,7 @@ function CalendarView() {
               <i className="sw flag" /> exceção
             </span>
           </div>
+          <PeriodOverride defaultFrom={today} onDone={load} />
           <a className="btn-secondary export-btn" href={`/api/reports/export.csv?from=${monthFrom}&to=${monthTo}`}>
             ⤓ Exportar CSV ({month.format('MMMM')})
           </a>
