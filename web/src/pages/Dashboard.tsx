@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { api, Punch, PunchKind, TodayResponse } from '../api';
 import { useAuth } from '../auth';
-import { fmtClock, fmtHora, fmtMin, fmtSigned, fmtDataLonga } from '../util';
+import { fmtClock, fmtHora, fmtMin, fmtSigned, fmtDataLonga, horaNoFuso } from '../util';
 
 type LiveState = 'off' | 'working' | 'onbreak';
 
@@ -41,6 +41,9 @@ export default function Dashboard() {
   const [now, setNow] = useState(Date.now());
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
+  // Ponto retroativo: quando ligado, os botões usam `manualTime` em vez de agora.
+  const [manual, setManual] = useState(false);
+  const [manualTime, setManualTime] = useState('');
   const tick = useRef<number>();
 
   const load = useCallback(async () => {
@@ -60,11 +63,21 @@ export default function Dashboard() {
     return () => window.clearInterval(tick.current);
   }, []);
 
+  /** Liga/desliga o modo retroativo, pré-preenchendo o horário com o de agora. */
+  function toggleManual() {
+    if (!manual && data) setManualTime(horaNoFuso(new Date().toISOString(), data.timezone));
+    setManual((v) => !v);
+  }
+
   async function punch(kind: PunchKind) {
+    if (manual && !manualTime) return;
     setBusy(true);
     setError('');
     try {
-      await api.post('/api/punches', { kind });
+      const body = manual && data ? { kind, date: data.today.date, time: manualTime } : { kind };
+      await api.post('/api/punches', body);
+      setManual(false);
+      setManualTime('');
       await load();
     } catch (e) {
       setError((e as Error).message);
@@ -89,6 +102,8 @@ export default function Dashboard() {
   const dayBalance = workedMin - expected;
   const tol = 0; // saldo do dia exibido "cru"; tolerância aparece no total/relatórios
   void tol;
+  const blocked = busy || (manual && !manualTime);
+  const manualSuffix = manual && manualTime ? ` às ${manualTime}` : '';
 
   return (
     <div className="page">
@@ -127,25 +142,43 @@ export default function Dashboard() {
 
       <section className="actions">
         {live.state === 'off' && (
-          <button className="btn-big btn-in" disabled={busy} onClick={() => punch('clock_in')}>
-            ▶ Registrar entrada
+          <button className="btn-big btn-in" disabled={blocked} onClick={() => punch('clock_in')}>
+            ▶ Registrar entrada{manualSuffix}
           </button>
         )}
         {live.state === 'working' && (
           <>
-            <button className="btn-big btn-break" disabled={busy} onClick={() => punch('break_start')}>
-              ☕ Iniciar intervalo
+            <button className="btn-big btn-break" disabled={blocked} onClick={() => punch('break_start')}>
+              ☕ Iniciar intervalo{manualSuffix}
             </button>
-            <button className="btn-big btn-out" disabled={busy} onClick={() => punch('clock_out')}>
-              ⏹ Registrar saída
+            <button className="btn-big btn-out" disabled={blocked} onClick={() => punch('clock_out')}>
+              ⏹ Registrar saída{manualSuffix}
             </button>
           </>
         )}
         {live.state === 'onbreak' && (
-          <button className="btn-big btn-in" disabled={busy} onClick={() => punch('break_end')}>
-            ↩ Voltar do intervalo
+          <button className="btn-big btn-in" disabled={blocked} onClick={() => punch('break_end')}>
+            ↩ Voltar do intervalo{manualSuffix}
           </button>
         )}
+
+        <div className="manual-punch">
+          <label className="manual-toggle">
+            <input type="checkbox" checked={manual} onChange={toggleManual} disabled={busy} />
+            Bater em outro horário
+          </label>
+          {manual && (
+            <input
+              type="time"
+              value={manualTime}
+              onChange={(e) => setManualTime(e.target.value)}
+              disabled={busy}
+              aria-label="horário do registro"
+              autoFocus
+            />
+          )}
+        </div>
+        {manual && <p className="muted small">O registro entra em {fmtDataLonga(data.today.date)} no horário escolhido.</p>}
       </section>
 
       {error && <div className="error">{error}</div>}

@@ -42,6 +42,16 @@ export function fmtHora(iso: string): string {
   return dayjs(iso).format('HH:mm');
 }
 
+/** "HH:MM" do instante no fuso do usuário (para preencher `input type=time`). */
+export function horaNoFuso(iso: string, timezone: string): string {
+  return new Intl.DateTimeFormat('pt-BR', {
+    timeZone: timezone,
+    hour: '2-digit',
+    minute: '2-digit',
+    hour12: false,
+  }).format(new Date(iso));
+}
+
 export function fmtDataCurta(dateKey: string): string {
   return dayjs(dateKey).format('DD/MM');
 }
