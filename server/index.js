@@ -5,6 +5,7 @@ import path from 'node:path';
 import fs from 'node:fs';
 import { fileURLToPath } from 'node:url';
 
+import { migrateAlternatingPunches } from './normalize.js';
 import authRouter from './auth.js';
 import punchesRouter from './routes/punches.js';
 import settingsRouter from './routes/settings.js';
@@ -12,6 +13,9 @@ import reportsRouter from './routes/reports.js';
 import overridesRouter from './routes/overrides.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
+
+migrateAlternatingPunches();
+
 const app = express();
 const PORT = process.env.PORT || 3000;
 

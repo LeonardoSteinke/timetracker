@@ -162,10 +162,6 @@ select {
   text-align: center;
   box-shadow: 0 10px 30px rgba(79, 70, 229, 0.3);
 }
-.clock-card.state-onbreak {
-  background: linear-gradient(160deg, #d97706, #b45309);
-  box-shadow: 0 10px 30px rgba(217, 119, 6, 0.3);
-}
 .clock-card.state-off {
   background: linear-gradient(160deg, #475569, #334155);
   box-shadow: var(--shadow);
@@ -248,9 +244,6 @@ select {
 .btn-out {
   background: var(--red);
 }
-.btn-break {
-  background: var(--amber);
-}
 
 /* ─── Cards ───────────────────────────────────────────────────────────────── */
 .card {
@@ -310,9 +303,6 @@ select {
 }
 .dot.k-out {
   background: var(--red);
-}
-.dot.k-break {
-  background: var(--amber);
 }
 .punch-label {
   flex: 1;
@@ -702,16 +692,6 @@ select {
 .punch-row.edit {
   gap: 8px;
 }
-.punch-kind {
-  flex: 1;
-  min-width: 0;
-  padding: 8px;
-  border: 1px solid var(--border);
-  border-radius: 8px;
-  background: var(--surface-2);
-  color: var(--text);
-  font-size: 0.88rem;
-}
 .punch-time-input,
 .add-punch input {
   padding: 8px;
@@ -729,15 +709,9 @@ select {
   padding-top: 12px;
   border-top: 1px dashed var(--border);
 }
-.add-punch select {
+.add-punch span {
   flex: 1;
   min-width: 0;
-  padding: 8px;
-  border: 1px solid var(--border);
-  border-radius: 8px;
-  background: var(--surface-2);
-  color: var(--text);
-  font-size: 0.88rem;
 }
 .add-punch .btn-secondary {
   padding: 9px 12px;
@@ -936,4 +910,8 @@ select {
   display: block;
   text-align: center;
   text-decoration: none;
+}
+
+.center {
+  text-align: center;
 }

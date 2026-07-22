@@ -34,7 +34,8 @@ export const api = {
 // ─── Tipos compartilhados com o backend ──────────────────────────────────────
 export type User = { id: number; name: string; username: string; is_admin: number };
 
-export type PunchKind = 'clock_in' | 'clock_out' | 'break_start' | 'break_end';
+/** Entrada e saída se alternam pela ordem do dia — o servidor é quem decide. */
+export type PunchKind = 'clock_in' | 'clock_out';
 /** `time` ('HH:MM' no fuso do usuário) só vem no endpoint /api/reports/day. */
 export type Punch = { id: number; ts: string; kind: PunchKind; note?: string | null; time?: string };
 
@@ -58,7 +59,7 @@ export type DaySummary = {
   /** false = fora da janela ativa (antes do 1º ponto ou no futuro): não gera saldo. */
   counted: boolean;
   open: boolean;
-  state: 'off' | 'working' | 'onbreak';
+  state: 'off' | 'working';
   override: DayOverride | null;
   punches: Punch[];
 };

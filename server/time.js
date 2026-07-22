@@ -62,44 +62,36 @@ export function weekdayOf(dateKey) {
 
 /**
  * Percorre os punches (ordenados) de um dia e devolve tempo trabalhado e de
- * intervalo em minutos. Se a sessão estiver aberta, conta até `nowIso`.
- * Estados: off → working → onbreak.
+ * intervalo em minutos. Os pontos alternam entrada/saída pela posição — par é
+ * entrada, ímpar é saída — então trabalhado é a soma dos pares entrada→saída e
+ * intervalo é cada buraco entre uma saída e a entrada seguinte. Se o último
+ * ponto for uma entrada, a sessão está aberta e conta até `nowIso`.
  */
 export function computeDay(punches, nowIso = null) {
   const sorted = [...punches].sort((a, b) => a.ts.localeCompare(b.ts));
   let workedMs = 0;
   let breakMs = 0;
-  let state = 'off';
-  let last = null;
 
-  for (const p of sorted) {
-    const t = Date.parse(p.ts);
-    if (state === 'working' && last != null) workedMs += t - last;
-    if (state === 'onbreak' && last != null) breakMs += t - last;
+  for (let i = 0; i < sorted.length; i += 2) {
+    const entrada = Date.parse(sorted[i].ts);
+    const saidaPunch = sorted[i + 1];
+    // sessão aberta: até agora (ou nada, se for um dia passado deixado aberto)
+    const saida = saidaPunch ? Date.parse(saidaPunch.ts) : nowIso ? Date.parse(nowIso) : entrada;
+    if (saida > entrada) workedMs += saida - entrada;
 
-    switch (p.kind) {
-      case 'clock_in':    state = 'working'; break;
-      case 'clock_out':   state = 'off'; break;
-      case 'break_start': if (state === 'working') state = 'onbreak'; break;
-      case 'break_end':   if (state === 'onbreak') state = 'working'; break;
-    }
-    last = t;
-  }
-
-  // sessão aberta: conta até agora
-  if (state !== 'off' && nowIso && last != null) {
-    const now = Date.parse(nowIso);
-    if (now > last) {
-      if (state === 'working') workedMs += now - last;
-      else if (state === 'onbreak') breakMs += now - last;
+    const proximaEntrada = sorted[i + 2];
+    if (saidaPunch && proximaEntrada) {
+      const gap = Date.parse(proximaEntrada.ts) - saida;
+      if (gap > 0) breakMs += gap;
     }
   }
 
+  const open = sorted.length % 2 === 1;
   return {
     workedMinutes: Math.round(workedMs / 60000),
     breakMinutes: Math.round(breakMs / 60000),
-    open: state !== 'off',
-    state, // off | working | onbreak
+    open,
+    state: open ? 'working' : 'off',
   };
 }
 

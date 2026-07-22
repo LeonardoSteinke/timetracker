@@ -3,17 +3,15 @@ import { useNavigate, useParams } from 'react-router-dom';
 import { api, DayResponse, OverrideKind, Punch, PunchKind } from '../api';
 import { fmtMin, fmtSigned, fmtDataLonga, WEEKDAYS_LONG, OVERRIDE_LABEL } from '../util';
 
+// O tipo vem da posição do ponto no dia (entrada, saída, entrada, saída…), não
+// de uma escolha — por isso aqui só se edita o horário.
 const KIND_LABEL: Record<PunchKind, string> = {
   clock_in: 'Entrada',
   clock_out: 'Saída',
-  break_start: 'Início intervalo',
-  break_end: 'Fim intervalo',
 };
 const KIND_CLS: Record<PunchKind, string> = {
   clock_in: 'k-in',
   clock_out: 'k-out',
-  break_start: 'k-break',
-  break_end: 'k-break',
 };
 
 const OVERRIDE_KINDS: OverrideKind[] = ['holiday', 'vacation', 'sick', 'dayoff', 'custom'];
@@ -101,6 +99,10 @@ export default function DayEditor() {
           <h3>Registros</h3>
           {day.open && <span className="badge">em andamento</span>}
         </div>
+        <p className="muted small">
+          Entrada e saída se alternam pela ordem dos horários — mudar uma hora reordena o dia
+          sozinho. O tempo entre uma saída e a entrada seguinte vira intervalo.
+        </p>
 
         {day.punches.length === 0 ? (
           <p className="muted">Nenhum registro neste dia.</p>
@@ -161,28 +163,20 @@ function PunchEditRow({
   // `time` vem do servidor já no fuso do usuário; devolvemos date+time e o
   // servidor faz a conversão para UTC.
   const [time, setTime] = useState(p.time ?? '');
-  const [kind, setKind] = useState<PunchKind>(p.kind);
 
   useEffect(() => {
     setTime(p.time ?? '');
-    setKind(p.kind);
-  }, [p.time, p.kind]);
+  }, [p.time]);
 
-  const dirty = time !== p.time || kind !== p.kind;
+  const dirty = time !== p.time;
 
   return (
     <li className="punch-row edit">
-      <span className={`dot ${KIND_CLS[kind]}`} />
-      <select className="punch-kind" value={kind} onChange={(e) => setKind(e.target.value as PunchKind)} disabled={busy}>
-        {(Object.keys(KIND_LABEL) as PunchKind[]).map((k) => (
-          <option key={k} value={k}>
-            {KIND_LABEL[k]}
-          </option>
-        ))}
-      </select>
+      <span className={`dot ${KIND_CLS[p.kind]}`} />
+      <span className="punch-label">{KIND_LABEL[p.kind]}</span>
       <input type="time" className="punch-time-input" value={time} onChange={(e) => setTime(e.target.value)} disabled={busy} />
       {dirty ? (
-        <button className="link-btn" disabled={busy || !time} onClick={() => onSave({ date, time, kind })}>
+        <button className="link-btn" disabled={busy || !time} onClick={() => onSave({ date, time })}>
           salvar
         </button>
       ) : (
@@ -203,24 +197,17 @@ function AddPunch({
   busy: boolean;
   onAdd: (body: Record<string, unknown>) => void;
 }) {
-  const [kind, setKind] = useState<PunchKind>('clock_in');
   const [time, setTime] = useState('');
 
   function submit() {
     if (!time) return;
-    onAdd({ kind, date, time });
+    onAdd({ date, time });
     setTime('');
   }
 
   return (
     <div className="add-punch">
-      <select value={kind} onChange={(e) => setKind(e.target.value as PunchKind)} disabled={busy}>
-        {(Object.keys(KIND_LABEL) as PunchKind[]).map((k) => (
-          <option key={k} value={k}>
-            {KIND_LABEL[k]}
-          </option>
-        ))}
-      </select>
+      <span className="muted small">Novo ponto</span>
       <input type="time" value={time} onChange={(e) => setTime(e.target.value)} disabled={busy} />
       <button className="btn-secondary" disabled={busy || !time} onClick={submit}>
         Adicionar

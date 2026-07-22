@@ -3,36 +3,36 @@ import { api, Punch, PunchKind, TodayResponse } from '../api';
 import { useAuth } from '../auth';
 import { fmtClock, fmtHora, fmtMin, fmtSigned, fmtDataLonga, horaNoFuso } from '../util';
 
-type LiveState = 'off' | 'working' | 'onbreak';
+type LiveState = 'off' | 'working';
 
-/** Recalcula worked/break ao vivo (em segundos) a partir dos punches. */
+/**
+ * Recalcula worked/break ao vivo (em segundos). Mesma regra do servidor: os
+ * pontos alternam entrada/saída, trabalhado é a soma dos pares e intervalo é o
+ * buraco entre uma saída e a entrada seguinte.
+ */
 function liveCompute(punches: Punch[], nowMs: number) {
   const sorted = [...punches].sort((a, b) => a.ts.localeCompare(b.ts));
   let worked = 0;
   let brk = 0;
-  let state: LiveState = 'off';
-  let last: number | null = null;
-  for (const p of sorted) {
-    const t = Date.parse(p.ts);
-    if (state === 'working' && last != null) worked += t - last;
-    if (state === 'onbreak' && last != null) brk += t - last;
-    if (p.kind === 'clock_in') state = 'working';
-    else if (p.kind === 'clock_out') state = 'off';
-    else if (p.kind === 'break_start' && state === 'working') state = 'onbreak';
-    else if (p.kind === 'break_end' && state === 'onbreak') state = 'working';
-    last = t;
+  for (let i = 0; i < sorted.length; i += 2) {
+    const entrada = Date.parse(sorted[i].ts);
+    const saidaPunch = sorted[i + 1];
+    const saida = saidaPunch ? Date.parse(saidaPunch.ts) : nowMs;
+    if (saida > entrada) worked += saida - entrada;
+
+    const proximaEntrada = sorted[i + 2];
+    if (saidaPunch && proximaEntrada) {
+      const gap = Date.parse(proximaEntrada.ts) - saida;
+      if (gap > 0) brk += gap;
+    }
   }
-  if (state !== 'off' && last != null && nowMs > last) {
-    if (state === 'working') worked += nowMs - last;
-    else brk += nowMs - last;
-  }
+  const state: LiveState = sorted.length % 2 === 1 ? 'working' : 'off';
   return { workedSec: worked / 1000, breakSec: brk / 1000, state };
 }
 
 const STATUS_LABEL: Record<LiveState, string> = {
   off: 'Fora do expediente',
   working: 'Trabalhando',
-  onbreak: 'Em intervalo',
 };
 
 export default function Dashboard() {
@@ -72,10 +72,9 @@ export default function Dashboard() {
 
   async function confirmPunch() {
     if (!pending || !data) return;
-    const kind = pending;
     // Hora intocada → grava o instante exato (com segundos); ajustada → date+time.
     const agora = horaNoFuso(new Date().toISOString(), data.timezone);
-    const body = pendingTime === agora ? { kind } : { kind, date: data.today.date, time: pendingTime };
+    const body = pendingTime === agora ? {} : { date: data.today.date, time: pendingTime };
 
     setBusy(true);
     setError('');
@@ -143,26 +142,20 @@ export default function Dashboard() {
       </section>
 
       <section className="actions">
-        {live.state === 'off' && (
+        {live.state === 'off' ? (
           <button className="btn-big btn-in" disabled={busy} onClick={() => ask('clock_in')}>
             ▶ Registrar entrada
           </button>
-        )}
-        {live.state === 'working' && (
-          <>
-            <button className="btn-big btn-break" disabled={busy} onClick={() => ask('break_start')}>
-              ☕ Iniciar intervalo
-            </button>
-            <button className="btn-big btn-out" disabled={busy} onClick={() => ask('clock_out')}>
-              ⏹ Registrar saída
-            </button>
-          </>
-        )}
-        {live.state === 'onbreak' && (
-          <button className="btn-big btn-in" disabled={busy} onClick={() => ask('break_end')}>
-            ↩ Voltar do intervalo
+        ) : (
+          <button className="btn-big btn-out" disabled={busy} onClick={() => ask('clock_out')}>
+            ⏹ Registrar saída
           </button>
         )}
+        <p className="muted small center">
+          {live.state === 'off'
+            ? 'Saiu para o almoço? A saída e a entrada seguinte viram intervalo.'
+            : 'A próxima saída fecha a sessão — o tempo até a entrada seguinte conta como intervalo.'}
+        </p>
       </section>
 
       {pending && (
@@ -257,8 +250,6 @@ function ConfirmPunch({
 const KIND_META: Record<PunchKind, { label: string; cls: string }> = {
   clock_in: { label: 'Entrada', cls: 'k-in' },
   clock_out: { label: 'Saída', cls: 'k-out' },
-  break_start: { label: 'Início intervalo', cls: 'k-break' },
-  break_end: { label: 'Fim intervalo', cls: 'k-break' },
 };
 
 function PunchRow({ p, onChanged }: { p: Punch; onChanged: () => void }) {
