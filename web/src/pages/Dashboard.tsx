@@ -74,6 +74,9 @@ function intervaloCurto(punches: Punch[], ts: string, minimo: number): number | 
   return min < minimo ? min : null;
 }
 
+/** Acima disso o cronômetro de intervalo em andamento some da tela. */
+const TETO_INTERVALO_SEC = 2 * 60 * 60;
+
 const STATUS_LABEL: Record<LiveState, string> = {
   off: 'Fora do expediente',
   working: 'Trabalhando',
@@ -236,9 +239,15 @@ export default function Dashboard() {
   const remaining = Math.max(0, expected - workedMin);
   // Saiu no meio da jornada → está no intervalo, e ele já conta a partir de
   // agora. Depois de cumprir o previsto a saída é fim de expediente, não
-  // intervalo — aí o contador não roda mais.
+  // intervalo — aí o contador não roda mais. Passando do teto, também não:
+  // quem está fora há mais de duas horas não está no almoço, e o cronômetro
+  // subindo sozinho só confunde.
   const noIntervalo =
-    minimoIntervalo > 0 && live.state === 'off' && punches.length > 0 && workedMin < expected;
+    minimoIntervalo > 0 &&
+    live.state === 'off' &&
+    punches.length > 0 &&
+    workedMin < expected &&
+    live.abertoSec <= TETO_INTERVALO_SEC;
   const intervaloSec = live.breakSec + (noIntervalo ? live.abertoSec : 0);
   const faltaIntervalo = Math.max(0, minimoIntervalo - live.abertoSec / 60);
   const dayBalance = workedMin - expected;
