@@ -1,5 +1,6 @@
 import { Navigate, NavLink, Route, Routes } from 'react-router-dom';
 import { useAuth } from './auth';
+import InstallBanner from './install';
 import Login from './pages/Login';
 import Dashboard from './pages/Dashboard';
 import Week from './pages/Week';
@@ -42,6 +43,7 @@ export default function App() {
   return (
     <div className="app-shell">
       <main className="app-main">
+        <InstallBanner />
         <Routes>
           <Route path="/" element={<Dashboard />} />
           <Route path="/semana" element={<Week />} />

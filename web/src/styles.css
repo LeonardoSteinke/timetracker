@@ -861,6 +861,60 @@ select {
   font-size: 0.88rem;
 }
 
+/* ─── Convite para instalar ───────────────────────────────────────────────── */
+.badge.ok {
+  color: var(--green);
+  border-color: var(--green);
+  background: var(--green-bg);
+}
+.install-banner {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 12px;
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  background: var(--surface);
+  box-shadow: var(--shadow);
+}
+.install-icon {
+  font-size: 1.4rem;
+}
+.install-text {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-width: 0;
+  line-height: 1.25;
+}
+.install-text strong {
+  font-size: 0.92rem;
+}
+.install-cta {
+  padding: 8px 12px;
+  font-size: 0.85rem;
+  white-space: nowrap;
+}
+.install-close {
+  padding: 0 2px;
+  color: var(--muted);
+}
+.install-help {
+  text-align: left;
+}
+.install-help ol {
+  margin: 4px 0;
+  padding-left: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  font-size: 0.9rem;
+}
+.ios-share {
+  vertical-align: -3px;
+  color: var(--indigo);
+}
+
 /* ─── Modal ───────────────────────────────────────────────────────────────── */
 .modal-backdrop {
   position: fixed;
