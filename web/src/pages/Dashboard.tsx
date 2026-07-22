@@ -251,6 +251,13 @@ export default function Dashboard() {
   const intervaloSec = live.breakSec + (noIntervalo ? live.abertoSec : 0);
   const faltaIntervalo = Math.max(0, minimoIntervalo - live.abertoSec / 60);
   const dayBalance = workedMin - expected;
+  // Horário em que a jornada fecha se o dia seguir a partir de agora — enquanto
+  // está no intervalo a previsão vai empurrando junto. O quanto falta em minutos
+  // já é o saldo do dia com o sinal trocado, então não vale um espaço na tela.
+  const saidaPrevista =
+    punches.length > 0 && expected > 0 && remaining > 0
+      ? horaNoFuso(new Date(now + remaining * 60000).toISOString(), view.timezone)
+      : null;
   const tol = 0; // saldo do dia exibido "cru"; tolerância aparece no total/relatórios
   void tol;
 
@@ -285,8 +292,10 @@ export default function Dashboard() {
 
         <div className="mini-stats">
           <div>
-            <span className="mini-value">{expected > 0 ? fmtMin(remaining) : '—'}</span>
-            <span className="mini-label">falta</span>
+            <span className="mini-value">
+              {saidaPrevista ?? (punches.length > 0 && expected > 0 ? '✓' : '—')}
+            </span>
+            <span className="mini-label">saída prevista</span>
           </div>
           <div>
             <span className="mini-value">{fmtMin(intervaloSec / 60)}</span>
