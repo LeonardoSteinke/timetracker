@@ -3,8 +3,12 @@ services:
     build: .
     container_name: ${PROJECT_NAME:-timetracker}
     restart: unless-stopped
+    # Sem porta publicada: assume um proxy reverso na mesma rede Docker.
+    # Para rodar isolado, troque este `expose` e o bloco `networks` abaixo por:
+    #   ports:
+    #     - "3000:3000"
     expose:
-      - "3000"            # porta interna — nginx-proxy roteia pra cá (nunca publicada no host)
+      - "3000"
     env_file:
       - .env
     environment:
@@ -16,6 +20,8 @@ services:
       - proxy_net
 
 networks:
+  # Rede externa onde vive o proxy reverso. Ajuste `name` para a sua, ou remova
+  # este bloco (e o `networks` do serviço) se for publicar a porta direto.
   proxy_net:
     external: true
-    name: media_server_media_net
+    name: ${PROXY_NETWORK:-media_server_media_net}
