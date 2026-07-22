@@ -6,6 +6,48 @@ import { WEEKDAYS_LONG } from '../util';
 // ordem de exibição: segunda → domingo
 const ORDER = [1, 2, 3, 4, 5, 6, 0];
 
+/** Campo numérico que aceita ficar vazio — vazio vale zero. */
+function NumInput({
+  value,
+  min,
+  max,
+  onChange,
+}: {
+  value: number;
+  min: number;
+  max: number;
+  onChange: (n: number) => void;
+}) {
+  const [text, setText] = useState(String(value));
+
+  // acompanha mudanças vindas de fora (carregar/salvar) sem atrapalhar a digitação
+  useEffect(() => {
+    if ((text === '' ? 0 : Number(text)) !== value) setText(String(value));
+  }, [value]);
+
+  return (
+    <input
+      type="number"
+      inputMode="numeric"
+      min={min}
+      max={max}
+      value={text}
+      onChange={(e) => {
+        const raw = e.target.value;
+        if (raw === '') {
+          setText('');
+          onChange(0);
+          return;
+        }
+        const n = Math.min(max, Math.max(min, Number(raw) || 0));
+        setText(String(n));
+        onChange(n);
+      }}
+      onBlur={() => setText(String(value))}
+    />
+  );
+}
+
 function HourMinInput({
   minutes,
   onChange,
@@ -17,21 +59,9 @@ function HourMinInput({
   const m = minutes % 60;
   return (
     <div className="hm-input">
-      <input
-        type="number"
-        min={0}
-        max={24}
-        value={h}
-        onChange={(e) => onChange(Math.min(1440, (Number(e.target.value) || 0) * 60 + m))}
-      />
+      <NumInput value={h} min={0} max={24} onChange={(n) => onChange(Math.min(1440, n * 60 + m))} />
       <span>h</span>
-      <input
-        type="number"
-        min={0}
-        max={59}
-        value={m}
-        onChange={(e) => onChange(h * 60 + Math.min(59, Number(e.target.value) || 0))}
-      />
+      <NumInput value={m} min={0} max={59} onChange={(n) => onChange(h * 60 + n)} />
       <span>min</span>
     </div>
   );
@@ -99,12 +129,11 @@ export default function Settings() {
         <h3>Tolerância</h3>
         <p className="muted small">Diferenças menores que isso não contam no saldo do dia.</p>
         <div className="inline-field">
-          <input
-            type="number"
+          <NumInput
+            value={s.tolerance_minutes}
             min={0}
             max={240}
-            value={s.tolerance_minutes}
-            onChange={(e) => setS({ ...s, tolerance_minutes: Number(e.target.value) || 0 })}
+            onChange={(n) => setS({ ...s, tolerance_minutes: n })}
           />
           <span>minutos</span>
         </div>
