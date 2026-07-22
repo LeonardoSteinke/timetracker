@@ -24,6 +24,8 @@ export type PontoPendente = {
   userId: number;
   ts: string;
   note?: string | null;
+  /** Ponto que o usuário mandou gravar mesmo com o aviso de intervalo curto. */
+  force?: boolean;
 };
 
 function ler<T>(key: string): T | null {
@@ -116,8 +118,8 @@ function novoId(): string {
 }
 
 /** Enfileira um ponto e devolve o registro pendente para exibição imediata. */
-export function enfileirar(userId: number, ts: string, note?: string | null): PontoPendente {
-  const p: PontoPendente = { clientId: novoId(), userId, ts, note: note ?? null };
+export function enfileirar(userId: number, ts: string, note?: string | null, force = false): PontoPendente {
+  const p: PontoPendente = { clientId: novoId(), userId, ts, note: note ?? null, force };
   setFila([...getFila(), p]);
   return p;
 }
@@ -138,7 +140,14 @@ export async function enviarFila(userId: number): Promise<void> {
   try {
     for (const p of getFila(userId)) {
       try {
-        await api.post('/api/punches', { clientId: p.clientId, ts: p.ts, note: p.note || undefined });
+        // `force`: o aviso de intervalo curto já foi respondido na tela, aqui
+        // não dá para perguntar de novo — e sem isso o ponto seria descartado.
+        await api.post('/api/punches', {
+          clientId: p.clientId,
+          ts: p.ts,
+          note: p.note || undefined,
+          force: p.force || undefined,
+        });
       } catch (e) {
         if (isNetworkError(e)) return;
         if (e instanceof ApiError && (e.status === 401 || e.status >= 500)) return;

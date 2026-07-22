@@ -14,7 +14,16 @@ import {
   subscribe,
   subscribeOnline,
 } from '../offline';
-import { fmtClock, fmtHora, fmtMin, fmtSigned, fmtDataLonga, horaNoFuso, isoFromLocal } from '../util';
+import {
+  fmtClock,
+  fmtHora,
+  fmtMin,
+  fmtSigned,
+  fmtDataLonga,
+  horaNoFuso,
+  isoFromLocal,
+  noMinutoCheio,
+} from '../util';
 
 type LiveState = 'off' | 'working';
 
@@ -22,6 +31,10 @@ type LiveState = 'off' | 'working';
  * Recalcula worked/break ao vivo (em segundos). Mesma regra do servidor: os
  * pontos alternam entrada/saída, trabalhado é a soma dos pares e intervalo é o
  * buraco entre uma saída e a entrada seguinte.
+ *
+ * `abertoSec` é o intervalo em andamento — o tempo desde a última saída, que só
+ * vira intervalo fechado quando a entrada seguinte chega. O contador na tela
+ * precisa dele para começar a rodar assim que se sai para o almoço.
  */
 function liveCompute(punches: Punch[], nowMs: number) {
   const sorted = [...punches].sort((a, b) => a.ts.localeCompare(b.ts));
@@ -40,7 +53,25 @@ function liveCompute(punches: Punch[], nowMs: number) {
     }
   }
   const state: LiveState = sorted.length % 2 === 1 ? 'working' : 'off';
-  return { workedSec: worked / 1000, breakSec: brk / 1000, state };
+  const ultima = sorted[sorted.length - 1];
+  const abertoMs = state === 'off' && ultima ? Math.max(0, nowMs - Date.parse(ultima.ts)) : 0;
+  return { workedSec: worked / 1000, breakSec: brk / 1000, abertoSec: abertoMs / 1000, state };
+}
+
+/**
+ * Minutos do intervalo que um ponto novo em `ts` fecha (ou abre), quando ele
+ * fica abaixo do mínimo — senão `null`. Espelha o `shortBreakAround` do
+ * servidor: como o tipo vem da posição, índice par é entrada e fecha o
+ * intervalo anterior; ímpar é saída e abre o intervalo até a entrada seguinte.
+ */
+function intervaloCurto(punches: Punch[], ts: string, minimo: number): number | null {
+  if (!minimo) return null;
+  const sorted = [...punches, { ts } as Punch].sort((a, b) => a.ts.localeCompare(b.ts));
+  const idx = sorted.findIndex((p) => p.ts === ts);
+  const vizinho = idx % 2 === 0 ? sorted[idx - 1] : sorted[idx + 1];
+  if (!vizinho) return null;
+  const min = Math.round(Math.abs(Date.parse(ts) - Date.parse(vizinho.ts)) / 60000);
+  return min < minimo ? min : null;
 }
 
 const STATUS_LABEL: Record<LiveState, string> = {
@@ -109,6 +140,32 @@ export default function Dashboard() {
     return () => window.clearInterval(tick.current);
   }, []);
 
+  /**
+   * O celular congela a página enquanto o app fica em segundo plano — é o que
+   * acontece no intervalo do almoço: o `setInterval` para de disparar e, ao
+   * voltar, o cronômetro está parado na hora em que a tela apagou. Ao reaparecer
+   * (ou reganhar o foco) acertamos o relógio na hora e recarregamos o dia.
+   */
+  useEffect(() => {
+    const acordar = () => {
+      if (document.visibilityState !== 'visible') return;
+      setNow(Date.now());
+      load();
+    };
+    document.addEventListener('visibilitychange', acordar);
+    window.addEventListener('focus', acordar);
+    window.addEventListener('pageshow', acordar);
+    return () => {
+      document.removeEventListener('visibilitychange', acordar);
+      window.removeEventListener('focus', acordar);
+      window.removeEventListener('pageshow', acordar);
+    };
+  }, [load]);
+
+  // Intervalo mínimo configurado nos Ajustes. Retrato antigo do cache offline
+  // pode não trazer o campo — aí vale o padrão de 30 min.
+  const minimoIntervalo = data?.minBreakMinutes ?? 30;
+
   /** Abre a confirmação já com a hora de agora — é só confirmar no caso normal. */
   function ask(kind: PunchKind) {
     if (!data) return;
@@ -123,17 +180,29 @@ export default function Dashboard() {
    */
   async function confirmPunch() {
     if (!pending || !data || !user) return;
-    // Hora intocada → instante exato (com segundos); ajustada → hora escolhida.
+    // Hora intocada → agora; ajustada → hora escolhida. Sempre no minuto cheio:
+    // é 'HH:MM' que aparece na tela, então é 'HH:MM' que tem que ser gravado.
     const agora = horaNoFuso(new Date().toISOString(), data.timezone);
     const ts =
       pendingTime === agora
-        ? new Date().toISOString()
+        ? noMinutoCheio(new Date().toISOString())
         : isoFromLocal(data.today.date, pendingTime, data.timezone);
+
+    // Intervalo curto demais: avisa antes de gravar. A conta é feita aqui (e não
+    // só no servidor) para o aviso também aparecer offline.
+    const curto = intervaloCurto(juntarPendentes(data, fila).today.punches, ts, minimoIntervalo);
+    const forcar = curto != null;
+    if (curto != null) {
+      const ok = confirm(
+        `Este ponto fecha um intervalo de ${curto} min, menor que o mínimo de ${minimoIntervalo} min. Registrar mesmo assim?`
+      );
+      if (!ok) return;
+    }
 
     setBusy(true);
     setError('');
     try {
-      enfileirar(user.id, ts);
+      enfileirar(user.id, ts, null, forcar);
       setPending(null);
       await enviarFila(user.id);
       await load();
@@ -165,6 +234,13 @@ export default function Dashboard() {
   const workedMin = live.workedSec / 60;
   const expected = view.today.expectedMinutes;
   const remaining = Math.max(0, expected - workedMin);
+  // Saiu no meio da jornada → está no intervalo, e ele já conta a partir de
+  // agora. Depois de cumprir o previsto a saída é fim de expediente, não
+  // intervalo — aí o contador não roda mais.
+  const noIntervalo =
+    minimoIntervalo > 0 && live.state === 'off' && punches.length > 0 && workedMin < expected;
+  const intervaloSec = live.breakSec + (noIntervalo ? live.abertoSec : 0);
+  const faltaIntervalo = Math.max(0, minimoIntervalo - live.abertoSec / 60);
   const dayBalance = workedMin - expected;
   const tol = 0; // saldo do dia exibido "cru"; tolerância aparece no total/relatórios
   void tol;
@@ -204,8 +280,9 @@ export default function Dashboard() {
             <span className="mini-label">falta</span>
           </div>
           <div>
-            <span className="mini-value">{fmtMin(live.breakSec / 60)}</span>
-            <span className="mini-label">intervalo</span>
+            <span className="mini-value">{fmtMin(intervaloSec / 60)}</span>
+            {/* ⏱ marca que o contador está rodando agora, sem alargar o rótulo */}
+            <span className="mini-label">{noIntervalo ? 'intervalo ⏱' : 'intervalo'}</span>
           </div>
           <div>
             <span className={`mini-value ${dayBalance >= 0 ? 'pos' : 'neg'}`}>
@@ -227,9 +304,23 @@ export default function Dashboard() {
           </button>
         )}
         <p className="muted small center">
-          {live.state === 'off'
-            ? 'Saiu para o almoço? A saída e a entrada seguinte viram intervalo.'
-            : 'A próxima saída fecha a sessão — o tempo até a entrada seguinte conta como intervalo.'}
+          {noIntervalo ? (
+            faltaIntervalo > 0 ? (
+              <>
+                No intervalo há <strong>{fmtClock(live.abertoSec)}</strong> — faltam{' '}
+                {Math.ceil(faltaIntervalo)} min para o mínimo de {minimoIntervalo} min.
+              </>
+            ) : (
+              <>
+                No intervalo há <strong>{fmtClock(live.abertoSec)}</strong> — o mínimo de{' '}
+                {minimoIntervalo} min já foi cumprido.
+              </>
+            )
+          ) : live.state === 'off' ? (
+            'Saiu para o almoço? A saída e a entrada seguinte viram intervalo.'
+          ) : (
+            'A próxima saída fecha a sessão — o tempo até a entrada seguinte conta como intervalo.'
+          )}
         </p>
       </section>
 

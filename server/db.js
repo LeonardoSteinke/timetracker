@@ -10,6 +10,9 @@ db.pragma('journal_mode = WAL');
 db.pragma('foreign_keys = ON');
 
 // Schedule padrão: seg–sex 8h (480 min) com 60 min de intervalo; fim de semana livre.
+/** Intervalo mínimo padrão (minutos) entre uma saída e a entrada seguinte. */
+export const DEFAULT_MIN_BREAK = 30;
+
 export const DEFAULT_SCHEDULE = {
   0: { expected: 0, break: 0 }, // domingo
   1: { expected: 480, break: 60 },
@@ -35,6 +38,7 @@ db.exec(`
     tolerance_minutes INTEGER NOT NULL DEFAULT 5,
     timezone         TEXT NOT NULL DEFAULT 'America/Sao_Paulo',
     week_start       INTEGER NOT NULL DEFAULT 1,   -- 0=domingo, 1=segunda
+    min_break_minutes INTEGER NOT NULL DEFAULT 30,  -- intervalo mínimo (0 = sem checagem)
     schedule         TEXT NOT NULL                 -- JSON: { "0":{expected,break}, ... }
   );
 
@@ -72,5 +76,13 @@ if (!punchCols.includes('client_id')) {
   db.exec('ALTER TABLE punches ADD COLUMN client_id TEXT');
 }
 db.exec('CREATE UNIQUE INDEX IF NOT EXISTS idx_punches_client ON punches(user_id, client_id)');
+
+// ── min_break_minutes: intervalo mínimo entre uma saída e a entrada seguinte ──
+// Registrar um intervalo menor que isso gera aviso (e só grava se confirmado).
+// 0 desliga a checagem.
+const settingsCols = db.prepare('PRAGMA table_info(settings)').all().map((c) => c.name);
+if (!settingsCols.includes('min_break_minutes')) {
+  db.exec('ALTER TABLE settings ADD COLUMN min_break_minutes INTEGER NOT NULL DEFAULT 30');
+}
 
 export default db;

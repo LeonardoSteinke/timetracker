@@ -24,7 +24,9 @@ Tolerância configurável evita que cinco minutos a menos virem dívida.
 trabalhado no dia.
 
 **Hoje** — quanto já trabalhou, quanto falta para fechar a jornada, tempo de
-intervalo e saldo do dia.
+intervalo e saldo do dia. O intervalo começa a contar assim que se bate a saída
+no meio da jornada, e o app avisa se a volta acontecer antes do mínimo
+configurado (30 min por padrão).
 
 **Semana** — trabalhado × previsto por dia em barras comparativas, saldo diário e
 total da semana, com navegação entre semanas.
@@ -107,8 +109,8 @@ O `REGISTRATION_CODE` é o que impede cadastro aberto se a instância for expost
 internet. Compartilhe só com quem deve ter acesso, e troque depois que todos
 estiverem cadastrados (editar o `.env` e `docker compose up -d`).
 
-Jornada por dia da semana, tolerância, fuso e início da semana são configurados
-por usuário, dentro do app, em **Ajustes**.
+Jornada por dia da semana, tolerância, intervalo mínimo, fuso e início da semana
+são configurados por usuário, dentro do app, em **Ajustes**.
 
 ### Rede
 
@@ -216,7 +218,7 @@ Todas as rotas exigem o cookie de sessão, exceto cadastro e login.
 | `GET` | `/api/reports/range?from=&to=` | Intervalo arbitrário |
 | `GET` | `/api/reports/total` | Saldo acumulado |
 | `GET` | `/api/reports/export.csv?from=&to=` | Exportação CSV |
-| `GET` | `/api/settings` · `PUT` | Jornada, tolerância, fuso, início da semana |
+| `GET` | `/api/settings` · `PUT` | Jornada, tolerância, intervalo mínimo, fuso, início da semana |
 | `GET` | `/api/overrides?from=&to=` | Exceções de jornada |
 | `PUT` | `/api/overrides/:date` | Define feriado/férias/atestado/folga/especial |
 | `DELETE` | `/api/overrides/:date` | Remove a exceção |

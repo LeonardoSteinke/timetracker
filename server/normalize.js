@@ -4,7 +4,7 @@
 // horário — assim é impossível o banco guardar duas saídas seguidas.
 
 import db from './db.js';
-import { localDateKey } from './time.js';
+import { localDateKey, truncMinute } from './time.js';
 import { getSettings, addDays } from './summary.js';
 
 const selectDay = db.prepare(
@@ -58,4 +58,22 @@ export function migrateAlternatingPunches() {
 
   db.pragma('user_version = 1');
   console.log(`migração: pontos alternando entrada/saída (${users.length} usuário(s), ${dias} dia(s))`);
+}
+
+/**
+ * Migração única: pontos antigos guardavam os segundos do instante em que se
+ * bateu o ponto, então "12:58 → 13:28" na tela podia valer 29 min na conta.
+ * Zerando os segundos, o minuto exibido passa a ser o minuto calculado.
+ */
+export function migrateTruncateSeconds() {
+  if (db.pragma('user_version', { simple: true }) >= 2) return;
+
+  const rows = db.prepare("SELECT id, ts FROM punches WHERE ts NOT LIKE '%:00.000Z'").all();
+  const update = db.prepare('UPDATE punches SET ts = ? WHERE id = ?');
+  db.transaction(() => {
+    for (const p of rows) update.run(truncMinute(p.ts), p.id);
+  })();
+
+  db.pragma('user_version = 2');
+  if (rows.length) console.log(`migração: ${rows.length} ponto(s) arredondado(s) para o minuto cheio`);
 }

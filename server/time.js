@@ -54,6 +54,39 @@ export function isoFromLocal(dateKey, hhmm, timezone) {
   return new Date(ts).toISOString();
 }
 
+/**
+ * Zera segundos e milissegundos de um instante ISO.
+ *
+ * O ponto é sempre exibido como 'HH:MM'; se o instante guardado tiver segundos,
+ * a conta não bate com o que está na tela — uma saída 12:58:33 seguida de uma
+ * entrada 13:28:00 são 29 min de intervalo, mas a tela mostra "12:58 → 13:28".
+ * Guardando tudo no minuto cheio, o que se vê é exatamente o que se calcula.
+ */
+export function truncMinute(iso) {
+  const d = new Date(iso);
+  d.setUTCSeconds(0, 0);
+  return d.toISOString();
+}
+
+/**
+ * Minutos do intervalo que o ponto em `ts` fecha ou abre, quando ele fica menor
+ * que `minMinutes` (0 desliga a checagem) — senão `null`. Como os tipos vêm da
+ * posição, um ponto em índice par é entrada (fecha o intervalo anterior) e em
+ * índice ímpar é saída (abre o intervalo até a entrada seguinte).
+ */
+export function shortBreakAround(punches, ts, minMinutes) {
+  if (!minMinutes) return null;
+  const sorted = [...punches].sort((a, b) => a.ts.localeCompare(b.ts));
+  const idx = sorted.findIndex((p) => p.ts === ts);
+  if (idx < 0) return null;
+
+  const vizinho = idx % 2 === 0 ? sorted[idx - 1] : sorted[idx + 1];
+  if (!vizinho) return null;
+  const gapMs = Math.abs(Date.parse(ts) - Date.parse(vizinho.ts));
+  const min = Math.round(gapMs / 60000);
+  return min < minMinutes ? min : null;
+}
+
 /** Dia da semana (0=domingo … 6=sábado) de uma data 'YYYY-MM-DD'. */
 export function weekdayOf(dateKey) {
   // meia-noite UTC do dia — só usamos o índice do dia da semana

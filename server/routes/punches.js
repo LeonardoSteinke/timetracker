@@ -2,8 +2,8 @@ import express from 'express';
 import { z } from 'zod';
 import db from '../db.js';
 import { requireAuth } from '../auth.js';
-import { localDateKey, isoFromLocal } from '../time.js';
-import { getSettings, rangeSummaries, totalBalance } from '../summary.js';
+import { localDateKey, isoFromLocal, truncMinute, shortBreakAround } from '../time.js';
+import { getSettings, rangeSummaries, totalBalance, addDays } from '../summary.js';
 import { normalizeDay } from '../normalize.js';
 
 const router = express.Router();
@@ -20,8 +20,39 @@ const localTimeFields = {
 
 /** Resolve o instante ISO a partir de `ts` ou do par `date`+`time` locais. */
 function resolveTs(data, timezone) {
-  if (data.date && data.time) return isoFromLocal(data.date, data.time, timezone);
-  return data.ts || null;
+  const iso = data.date && data.time ? isoFromLocal(data.date, data.time, timezone) : data.ts || null;
+  // sempre no minuto cheio: o app mostra 'HH:MM' e a conta tem que bater com isso
+  return iso ? truncMinute(iso) : null;
+}
+
+/** Pontos do usuário num dia local (para simular o dia antes de gravar). */
+function punchesOfDay(userId, dateKey, timezone) {
+  return db
+    .prepare('SELECT id, ts FROM punches WHERE user_id = ? AND ts >= ? AND ts < ? ORDER BY ts, id')
+    .all(userId, addDays(dateKey, -1) + 'T00:00:00.000Z', addDays(dateKey, 2) + 'T00:00:00.000Z')
+    .filter((p) => localDateKey(p.ts, timezone) === dateKey);
+}
+
+/**
+ * Recusa (409) um ponto que deixaria um intervalo menor que o mínimo — a menos
+ * que venha `force`, que é o "registrar assim mesmo" do aviso na tela. A
+ * checagem roda sobre o dia simulado, antes de gravar, para não precisar
+ * desfazer nada.
+ */
+function shortBreakBlock(res, userId, ts, settings, force, ignoreId = null) {
+  const minimo = settings.min_break_minutes;
+  if (force || !minimo) return false;
+  const { timezone } = settings;
+  const dia = punchesOfDay(userId, localDateKey(ts, timezone), timezone).filter((p) => p.id !== ignoreId);
+  const min = shortBreakAround([...dia, { ts }], ts, minimo);
+  if (min == null) return false;
+  res.status(409).json({
+    code: 'short_break',
+    breakMinutes: min,
+    minBreakMinutes: minimo,
+    error: `Intervalo de ${min} min — o mínimo é ${minimo} min.`,
+  });
+  return true;
 }
 
 /** Estado atual + resumo do dia (para o Dashboard "Hoje"). */
@@ -31,7 +62,14 @@ router.get('/today', (req, res) => {
   const todayKey = localDateKey(nowIso, settings.timezone);
   const [day] = rangeSummaries(req.user.id, todayKey, todayKey, settings, nowIso);
   const total = totalBalance(req.user.id, settings, nowIso);
-  res.json({ today: day, totalBalance: total.totalBalance, now: nowIso, timezone: settings.timezone });
+  res.json({
+    today: day,
+    totalBalance: total.totalBalance,
+    now: nowIso,
+    timezone: settings.timezone,
+    // o app precisa do mínimo para avisar do intervalo curto mesmo offline
+    minBreakMinutes: settings.min_break_minutes,
+  });
 });
 
 /**
@@ -47,6 +85,7 @@ router.post('/', (req, res) => {
     ts: z.string().datetime().optional(),
     note: z.string().max(200).optional(),
     clientId: z.string().min(8).max(64).optional(),
+    force: z.boolean().optional(),
     ...localTimeFields,
   });
   const parsed = schema.safeParse(req.body);
@@ -61,7 +100,9 @@ router.post('/', (req, res) => {
   }
 
   const settings = getSettings(req.user.id);
-  const ts = resolveTs(parsed.data, settings.timezone) || new Date().toISOString();
+  const ts = resolveTs(parsed.data, settings.timezone) || truncMinute(new Date().toISOString());
+  if (shortBreakBlock(res, req.user.id, ts, settings, parsed.data.force)) return;
+
   const info = db
     .prepare("INSERT INTO punches (user_id, ts, kind, note, client_id) VALUES (?,?,'clock_in',?,?)")
     .run(req.user.id, ts, parsed.data.note || null, clientId);
@@ -76,6 +117,7 @@ router.patch('/:id', (req, res) => {
   const schema = z.object({
     ts: z.string().datetime().optional(),
     note: z.string().max(200).nullable().optional(),
+    force: z.boolean().optional(),
     ...localTimeFields,
   });
   const parsed = schema.safeParse(req.body);
@@ -86,6 +128,8 @@ router.patch('/:id', (req, res) => {
 
   const settings = getSettings(req.user.id);
   const ts = resolveTs(parsed.data, settings.timezone) ?? row.ts;
+  if (ts !== row.ts && shortBreakBlock(res, req.user.id, ts, settings, parsed.data.force, row.id)) return;
+
   // `note` distingue ausente (mantém) de null (limpa) — por isso não usa COALESCE
   const note = 'note' in parsed.data ? parsed.data.note : row.note;
   db.prepare('UPDATE punches SET ts = ?, note = ? WHERE id = ?').run(ts, note, row.id);

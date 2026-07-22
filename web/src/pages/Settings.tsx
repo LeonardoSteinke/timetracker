@@ -140,6 +140,23 @@ export default function Settings() {
       </section>
 
       <section className="card">
+        <h3>Intervalo mínimo</h3>
+        <p className="muted small">
+          Ao voltar de um intervalo menor que isso, o app avisa antes de gravar o ponto (dá para
+          registrar assim mesmo). Zero desliga a checagem.
+        </p>
+        <div className="inline-field">
+          <NumInput
+            value={s.min_break_minutes}
+            min={0}
+            max={480}
+            onChange={(n) => setS({ ...s, min_break_minutes: n })}
+          />
+          <span>minutos</span>
+        </div>
+      </section>
+
+      <section className="card">
         <h3>Preferências</h3>
         <label className="field">
           Fuso horário

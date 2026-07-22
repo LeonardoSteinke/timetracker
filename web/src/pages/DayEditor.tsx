@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
-import { api, DayResponse, OverrideKind, Punch, PunchKind } from '../api';
+import { api, ApiError, DayResponse, OverrideKind, Punch, PunchKind } from '../api';
 import { fmtMin, fmtSigned, fmtDataLonga, WEEKDAYS_LONG, OVERRIDE_LABEL } from '../util';
 
 // O tipo vem da posição do ponto no dia (entrada, saída, entrada, saída…), não
@@ -36,6 +36,23 @@ export default function DayEditor() {
   useEffect(() => {
     load();
   }, [load]);
+
+  /**
+   * Grava um ponto. O servidor recusa (409) o que deixaria um intervalo menor
+   * que o mínimo; aqui a gente pergunta e reenvia com `force` se o usuário
+   * quiser mesmo assim.
+   */
+  function salvarPonto(envia: (extra: Record<string, unknown>) => Promise<unknown>) {
+    return run(async () => {
+      try {
+        await envia({});
+      } catch (e) {
+        if (!(e instanceof ApiError) || e.code !== 'short_break') throw e;
+        if (!confirm(`${e.message} Registrar mesmo assim?`)) return;
+        await envia({ force: true });
+      }
+    });
+  }
 
   /** Envolve uma mutação: trava a UI, propaga erro e recarrega o dia. */
   async function run(fn: () => Promise<unknown>) {
@@ -114,14 +131,18 @@ export default function DayEditor() {
                 p={p}
                 date={day.date}
                 busy={busy}
-                onSave={(patch) => run(() => api.patch(`/api/punches/${p.id}`, patch))}
+                onSave={(patch) => salvarPonto((extra) => api.patch(`/api/punches/${p.id}`, { ...patch, ...extra }))}
                 onDelete={() => run(() => api.del(`/api/punches/${p.id}`))}
               />
             ))}
           </ul>
         )}
 
-        <AddPunch date={day.date} busy={busy} onAdd={(body) => run(() => api.post('/api/punches', body))} />
+        <AddPunch
+          date={day.date}
+          busy={busy}
+          onAdd={(body) => salvarPonto((extra) => api.post('/api/punches', { ...body, ...extra }))}
+        />
       </section>
 
       <section className="card">

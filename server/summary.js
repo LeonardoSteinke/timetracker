@@ -1,4 +1,4 @@
-import db, { DEFAULT_SCHEDULE } from './db.js';
+import db, { DEFAULT_SCHEDULE, DEFAULT_MIN_BREAK } from './db.js';
 import { localDateKey, weekdayOf, computeDay, dayBalance } from './time.js';
 
 /** Carrega e normaliza as configurações do usuário. */
@@ -9,6 +9,7 @@ export function getSettings(userId) {
       tolerance_minutes: 5,
       timezone: process.env.TZ || 'America/Sao_Paulo',
       week_start: 1,
+      min_break_minutes: DEFAULT_MIN_BREAK,
       schedule: DEFAULT_SCHEDULE,
     };
   }

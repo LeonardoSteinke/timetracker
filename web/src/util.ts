@@ -88,6 +88,17 @@ export function isoFromLocal(date: string, time: string, timezone: string): stri
   return new Date(chute - off).toISOString();
 }
 
+/**
+ * Zera os segundos de um instante ISO. O ponto é mostrado como 'HH:MM', então é
+ * no minuto cheio que ele tem que ser gravado — senão "12:58 → 13:28" pode
+ * valer 29 min na conta. Mesma regra do `truncMinute` do servidor.
+ */
+export function noMinutoCheio(iso: string): string {
+  const d = new Date(iso);
+  d.setUTCSeconds(0, 0);
+  return d.toISOString();
+}
+
 export function fmtDataCurta(dateKey: string): string {
   return dayjs(dateKey).format('DD/MM');
 }
