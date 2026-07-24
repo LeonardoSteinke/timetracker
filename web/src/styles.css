@@ -524,6 +524,17 @@ select {
   background: var(--surface-2);
   color: var(--text);
 }
+/* No Safari o <select> não encolhe: fica do tamanho da opção mais longa (a
+   lista de fusos tem nomes bem compridos) e empurra a página para o lado.
+   Amarrar a largura na coluna resolve o tamanho da caixa, e o `contain` impede
+   que o texto cortado ainda conte como área rolável para os pais. */
+select {
+  width: 100%;
+  min-width: 0;
+  max-width: 100%;
+  text-overflow: ellipsis;
+  contain: paint;
+}
 
 /* ─── Botões primários / formulários ─────────────────────────────────────── */
 .btn-primary,
