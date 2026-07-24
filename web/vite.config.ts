@@ -55,6 +55,12 @@ export default defineConfig({
         ],
       },
       workbox: {
+        // Handlers de push/notificationclick anexados ao SW gerado (public/push-sw.js).
+        // O `?v=` carimba o build na URL: o navegador serve scripts importados
+        // pelo SW a partir do cache HTTP, e um proxy/CDN na frente pode ignorar
+        // o `no-cache` da origem (a Cloudflare troca por max-age de 4h) — assim
+        // uma URL nova a cada build não deixa ficar um handler velho.
+        importScripts: [`push-sw.js?v=${BUILD_ID}`],
         // O SW novo assume o controle imediatamente, sem esperar as abas fecharem.
         skipWaiting: true,
         clientsClaim: true,

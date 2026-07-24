@@ -3,7 +3,8 @@ import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
 import rateLimit from 'express-rate-limit';
 import { z } from 'zod';
-import db, { DEFAULT_SCHEDULE } from './db.js';
+import db, { DEFAULT_MIN_BREAK, DEFAULT_SCHEDULE, DEFAULT_TOLERANCE } from './db.js';
+import { convitePorCodigo, marcarUsado } from './invites.js';
 
 const JWT_SECRET = process.env.JWT_SECRET;
 if (!JWT_SECRET || JWT_SECRET.length < 16) {
@@ -36,13 +37,31 @@ export function requireAuth(req, res, next) {
   if (!token) return res.status(401).json({ error: 'não autenticado' });
   try {
     const payload = jwt.verify(token, JWT_SECRET);
-    const user = db.prepare('SELECT id, name, username, is_admin FROM users WHERE id = ?').get(payload.uid);
+    const user = db
+      .prepare('SELECT id, name, username, is_admin, invite_quota, password_changed_at FROM users WHERE id = ?')
+      .get(payload.uid);
     if (!user) return res.status(401).json({ error: 'sessão inválida' });
+    // Token emitido antes da última troca de senha não vale mais — é o que faz
+    // o reset feito pelo admin realmente expulsar quem estava logado.
+    if (payload.iat < user.password_changed_at) {
+      return res.status(401).json({ error: 'sessão expirada' });
+    }
     req.user = user;
     next();
   } catch {
     return res.status(401).json({ error: 'sessão expirada' });
   }
+}
+
+/** Middleware: exige admin master. Usar depois do requireAuth. */
+export function requireAdmin(req, res, next) {
+  if (!req.user?.is_admin) return res.status(403).json({ error: 'só o admin master pode fazer isso' });
+  next();
+}
+
+/** Epoch em segundos, a mesma unidade do `iat` do JWT. */
+export function agoraEmSegundos() {
+  return Math.floor(Date.now() / 1000);
 }
 
 const loginLimiter = rateLimit({
@@ -64,29 +83,68 @@ const registerSchema = credsSchema.extend({
 
 const router = express.Router();
 
+/**
+ * Cadastro. Dois caminhos de entrada, decididos pelo código:
+ *
+ * - `REGISTRATION_CODE` do .env → **admin master**, que administra os usuários;
+ * - convite gerado por alguém de dentro → usuário comum, e o convite se gasta.
+ *
+ * A resposta de recusa é a mesma nos dois casos: quem está tentando adivinhar
+ * não precisa saber qual tipo de código chegou perto.
+ */
 router.post('/register', loginLimiter, (req, res) => {
   const parsed = registerSchema.safeParse(req.body);
   if (!parsed.success) return res.status(400).json({ error: 'dados inválidos' });
-  const { name, username, password, code } = parsed.data;
+  const { name, username, password } = parsed.data;
+  const code = parsed.data.code.trim();
 
-  if (REGISTRATION_CODE && code !== REGISTRATION_CODE) {
+  // Instância recém-criada: o primeiro a chegar vira master mesmo sem código.
+  const isFirst = db.prepare('SELECT COUNT(*) AS n FROM users').get().n === 0;
+  const ehMaster = isFirst || (!!REGISTRATION_CODE && code === REGISTRATION_CODE);
+  const convite = ehMaster ? null : convitePorCodigo(code);
+  if (!ehMaster && !convite) {
     return res.status(403).json({ error: 'código de cadastro inválido' });
   }
+
   const exists = db.prepare('SELECT 1 FROM users WHERE username = ?').get(username);
   if (exists) return res.status(409).json({ error: 'nome de usuário já em uso' });
 
-  const isFirst = db.prepare('SELECT COUNT(*) AS n FROM users').get().n === 0;
   const hash = bcrypt.hashSync(password, 10);
-  const info = db
-    .prepare('INSERT INTO users (name, username, password_hash, is_admin) VALUES (?,?,?,?)')
-    .run(name, username, hash, isFirst ? 1 : 0);
+  // Numa transação: sem ela, dois cadastros simultâneos com o mesmo convite
+  // criariam dois usuários. O `marcarUsado` só acerta uma linha, e quem perder
+  // a corrida derruba a própria criação.
+  const criar = db.transaction(() => {
+    const info = db
+      .prepare('INSERT INTO users (name, username, password_hash, is_admin) VALUES (?,?,?,?)')
+      .run(name, username, hash, ehMaster ? 1 : 0);
+    const uid = info.lastInsertRowid;
 
-  db.prepare('INSERT INTO settings (user_id, schedule) VALUES (?, ?)')
-    .run(info.lastInsertRowid, JSON.stringify(DEFAULT_SCHEDULE));
+    // Valores explícitos, e não os DEFAULT da tabela: num banco criado antes de
+    // um padrão mudar, a coluna guarda o valor antigo — a fonte da verdade são
+    // as constantes do db.js.
+    db.prepare(
+      `INSERT INTO settings (user_id, tolerance_minutes, min_break_minutes, schedule)
+       VALUES (?, ?, ?, ?)`
+    ).run(uid, DEFAULT_TOLERANCE, DEFAULT_MIN_BREAK, JSON.stringify(DEFAULT_SCHEDULE));
 
-  const user = { id: info.lastInsertRowid, name };
-  res.cookie(COOKIE, sign(user), cookieOpts(req));
-  res.json({ id: user.id, name, username, is_admin: isFirst ? 1 : 0 });
+    if (convite && !marcarUsado(convite.id, uid)) {
+      throw new Error('convite_ja_usado');
+    }
+    return uid;
+  });
+
+  let id;
+  try {
+    id = criar();
+  } catch (e) {
+    if (e.message === 'convite_ja_usado') {
+      return res.status(403).json({ error: 'código de cadastro inválido' });
+    }
+    throw e;
+  }
+
+  res.cookie(COOKIE, sign({ id, name }), cookieOpts(req));
+  res.json({ id, name, username, is_admin: ehMaster ? 1 : 0 });
 });
 
 router.post('/login', loginLimiter, (req, res) => {
@@ -111,6 +169,19 @@ router.get('/me', requireAuth, (req, res) => {
   res.json(req.user);
 });
 
+/**
+ * Altera o nome de exibição. O nome de usuário não muda: é a identidade do
+ * login e o que o admin master enxerga na lista — deixá-lo editável só criaria
+ * confusão sobre quem é quem.
+ */
+router.patch('/me', requireAuth, (req, res) => {
+  const parsed = z.object({ name: z.string().trim().min(1).max(80) }).safeParse(req.body);
+  if (!parsed.success) return res.status(400).json({ error: 'nome inválido' });
+
+  db.prepare('UPDATE users SET name = ? WHERE id = ?').run(parsed.data.name, req.user.id);
+  res.json({ ...req.user, name: parsed.data.name });
+});
+
 router.post('/password', requireAuth, (req, res) => {
   const schema = z.object({
     current: z.string(),
@@ -124,7 +195,11 @@ router.post('/password', requireAuth, (req, res) => {
     return res.status(403).json({ error: 'senha atual incorreta' });
   }
   const hash = bcrypt.hashSync(parsed.data.next, 10);
-  db.prepare('UPDATE users SET password_hash = ? WHERE id = ?').run(hash, req.user.id);
+  const agora = agoraEmSegundos();
+  db.prepare('UPDATE users SET password_hash = ?, password_changed_at = ? WHERE id = ?')
+    .run(hash, agora, req.user.id);
+  // As outras sessões caem; esta continua, com um cookie emitido depois da troca.
+  res.cookie(COOKIE, sign(req.user), cookieOpts(req));
   res.json({ ok: true });
 });
 

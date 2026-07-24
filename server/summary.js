@@ -1,4 +1,4 @@
-import db, { DEFAULT_SCHEDULE, DEFAULT_MIN_BREAK } from './db.js';
+import db, { DEFAULT_SCHEDULE, DEFAULT_MIN_BREAK, DEFAULT_TOLERANCE, NOTIFY_DEFAULTS } from './db.js';
 import { localDateKey, weekdayOf, computeDay, dayBalance } from './time.js';
 
 /** Carrega e normaliza as configurações do usuário. */
@@ -6,10 +6,11 @@ export function getSettings(userId) {
   const row = db.prepare('SELECT * FROM settings WHERE user_id = ?').get(userId);
   if (!row) {
     return {
-      tolerance_minutes: 5,
+      tolerance_minutes: DEFAULT_TOLERANCE,
       timezone: process.env.TZ || 'America/Sao_Paulo',
       week_start: 1,
       min_break_minutes: DEFAULT_MIN_BREAK,
+      ...NOTIFY_DEFAULTS,
       schedule: DEFAULT_SCHEDULE,
     };
   }

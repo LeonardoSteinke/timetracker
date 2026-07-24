@@ -11,6 +11,10 @@ import punchesRouter from './routes/punches.js';
 import settingsRouter from './routes/settings.js';
 import reportsRouter from './routes/reports.js';
 import overridesRouter from './routes/overrides.js';
+import pushRouter from './routes/push.js';
+import invitesRouter from './routes/invites.js';
+import adminRouter from './routes/admin.js';
+import { startNotifier } from './notify.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
@@ -56,6 +60,9 @@ app.use('/api/punches', punchesRouter);
 app.use('/api/settings', settingsRouter);
 app.use('/api/reports', reportsRouter);
 app.use('/api/overrides', overridesRouter);
+app.use('/api/push', pushRouter);
+app.use('/api/invites', invitesRouter);
+app.use('/api/admin', adminRouter);
 
 // ── Frontend (build do Vite) ──────────────────────────────────────────────
 // Assets com hash no nome podem ser cacheados para sempre; o resto (index.html,
@@ -78,4 +85,5 @@ app.get(/^(?!\/api\/).*/, (req, res) => {
 
 app.listen(PORT, () => {
   console.log(`TimeTracker rodando na porta ${PORT}`);
+  startNotifier();
 });

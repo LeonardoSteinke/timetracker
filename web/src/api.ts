@@ -37,6 +37,41 @@ export const api = {
 // ─── Tipos compartilhados com o backend ──────────────────────────────────────
 export type User = { id: number; name: string; username: string; is_admin: number };
 
+/** Estado do convite; o servidor o deriva das datas. */
+export type InviteEstado = 'pendente' | 'aceito' | 'expirado';
+export type Invite = {
+  id: number;
+  code: string;
+  created_at: string;
+  expires_at: string;
+  used_at: string | null;
+  /** Quem entrou por este convite, quando já foi aceito. */
+  invitee_name: string | null;
+  estado: InviteEstado;
+};
+export type InvitesResponse = {
+  quota: number;
+  /** Vagas ocupadas: convites aceitos + pendentes. */
+  usadas: number;
+  restantes: number;
+  /** Dias de validade de um convite novo. */
+  ttlDays: number;
+  invites: Invite[];
+};
+
+/** Usuário como a tela de administração o vê. */
+export type AdminUser = {
+  id: number;
+  name: string;
+  username: string;
+  is_admin: number;
+  invite_quota: number;
+  invites_used: number;
+  created_at: string;
+  punches: number;
+  invited_by: string | null;
+};
+
 /** Entrada e saída se alternam pela ordem do dia — o servidor é quem decide. */
 export type PunchKind = 'clock_in' | 'clock_out';
 /**
@@ -96,6 +131,11 @@ export type Settings = {
   week_start: 0 | 1;
   /** Intervalo mínimo entre uma saída e a entrada seguinte; 0 = sem checagem. */
   min_break_minutes: number;
+  /** Avisos push (0/1 como o SQLite guarda). */
+  notify_end_of_day: 0 | 1;
+  /** Minutos de antecedência do aviso de fim de jornada; 0 = na hora. */
+  notify_end_lead_minutes: number;
+  notify_break_done: 0 | 1;
   schedule: Record<string, DayConfig>;
 };
 

@@ -45,12 +45,22 @@ jornada especial com os minutos na mão.
 previsto e saldo por dia. Separador `;` e BOM, para abrir direto no Excel em
 português.
 
+**Avisa no celular** — notificação quando a jornada do dia fecha (com
+antecedência configurável) e quando o intervalo mínimo é cumprido e já dá para
+voltar. Chega com o app fechado, via Web Push. Ligar é por aparelho, em
+**Ajustes → Notificações**; escolher quais avisos é por usuário.
+
 **Funciona sem internet** — instalado como PWA, o app abre e deixa bater o ponto
 mesmo offline: o registro fica numa fila local e sobe sozinho quando a conexão
 volta. Reenvio não duplica nada (cada ponto leva um id gerado no cliente).
 
 **Multiusuário** — cada pessoa tem seus próprios registros, jornada e fuso.
-Cadastro protegido por código de convite.
+
+**Convites e administração** — quem entra com o código do `.env` vira **admin
+master**: gerencia todos os usuários, ajusta quantas pessoas cada um pode
+convidar, redefine senhas e exclui contas. Todo mundo mais entra por **convite**
+gerado dentro do app — cada usuário pode trazer 5 pessoas por padrão, e o convite
+vale para uma pessoa só, por 7 dias.
 
 ## Stack
 
@@ -103,14 +113,32 @@ Tudo pelo `.env`:
 | `APP_PORT` | Porta interna da aplicação |
 | `TZ` | Fuso padrão de novos usuários |
 | `JWT_SECRET` | Assina os cookies de sessão — `openssl rand -hex 32` |
-| `REGISTRATION_CODE` | Código exigido no cadastro — `openssl rand -hex 12` |
-
-O `REGISTRATION_CODE` é o que impede cadastro aberto se a instância for exposta à
-internet. Compartilhe só com quem deve ter acesso, e troque depois que todos
-estiverem cadastrados (editar o `.env` e `docker compose up -d`).
+| `REGISTRATION_CODE` | Código que cria **admin master** — `openssl rand -hex 12` |
+| `VAPID_*` | Opcional: chaves das notificações push (geradas sozinhas, veja abaixo) |
 
 Jornada por dia da semana, tolerância, intervalo mínimo, fuso e início da semana
-são configurados por usuário, dentro do app, em **Ajustes**.
+são configurados por usuário, dentro do app, em **Ajustes**. Conta nova começa com
+8h48 de segunda a sexta (as 44h semanais da CLT), 10 min de tolerância e 30 min de
+intervalo mínimo.
+
+#### Quem entra e como
+
+Há dois níveis de acesso e dois jeitos de se cadastrar:
+
+- **Admin master** — quem usa o `REGISTRATION_CODE` do `.env`. Enxerga a tela de
+  usuários: cota de convites de cada um, redefinir senha, promover e excluir
+  contas. Guarde esse código como segredo e troque quando quiser fechar a porta
+  (editar o `.env` e `docker compose up -d`).
+- **Usuário comum** — entra por um convite gerado dentro do app, em **Ajustes →
+  Convites**. Cada convite vale para uma pessoa, expira em 7 dias e sai da cota de
+  quem convidou (5 por padrão, ajustável por usuário pelo master). Convite aceito
+  ocupa a vaga para sempre; revogar ou deixar vencer um não usado devolve a vaga.
+  Revogar apaga o convite, e o convite some junto com a conta que entrou por ele —
+  a lista mostra só o que ainda vale ou ainda existe.
+
+O primeiro cadastro de uma instância vazia vira master mesmo sem código, para dar
+partida. Redefinir a senha de alguém (pelo master ou pela própria pessoa) derruba
+as sessões abertas nos outros aparelhos.
 
 ### Rede
 
@@ -158,6 +186,49 @@ Declare os dois `listen`. Se o domínio resolver para o host também na rede
 interna (split DNS, Tailscale MagicDNS), o navegador vai bater direto na 443 — e
 sem esse bloco a requisição cai no `default_server` e abre outro serviço.
 
+**Com outro proxy na frente** (Cloudflare Tunnel, por exemplo), `$scheme` passa a
+ser o do salto interno em HTTP, e repassá-lo cru faz a aplicação achar que a
+conexão é insegura — o cookie de sessão sai sem a flag `Secure`. Prefira o
+protocolo que o cliente usou de verdade, caindo no `$scheme` quando não houver
+nenhum header:
+
+```nginx
+map $http_x_forwarded_proto $client_proto {
+    default $scheme;
+    "~."    $http_x_forwarded_proto;
+}
+# ... e no location:
+proxy_set_header X-Forwarded-Proto $client_proto;
+```
+
+Vale conferir também se o CDN respeita os headers de cache da origem: a
+Cloudflare, por padrão, troca o `no-cache` de qualquer `.js` por um `max-age` de
+4 h (`Browser Cache TTL`). O `sw.js` é revalidado pelo navegador de qualquer
+forma, e os scripts que ele importa levam o id do build na URL — mas se você
+servir outros arquivos sem hash no nome, ajuste para *Respect Existing Headers*.
+
+### Notificações push
+
+As chaves VAPID (a identidade do servidor perante o serviço de push) são geradas
+na primeira boot e guardadas em `data/vapid.json`, junto do banco — nada para
+configurar. Apagar esse arquivo derruba todas as assinaturas já feitas nos
+aparelhos; para gerenciar as chaves à mão, defina `VAPID_PUBLIC_KEY`,
+`VAPID_PRIVATE_KEY` e `VAPID_SUBJECT` no `.env`, que têm prioridade.
+
+Dois requisitos são do navegador, não do app:
+
+- **HTTPS com certificado válido.** Sem isso o navegador não registra o service
+  worker, e sem service worker não há push (nem modo offline). Certificado
+  self-signed ou acesso por HTTP puro não servem — na prática, publique atrás de
+  um proxy com certificado de verdade (Let's Encrypt, Cloudflare Tunnel).
+- **No iPhone, o app instalado na tela de início** (iOS 16.4+). No Safari em aba
+  o pedido de permissão nem aparece. No Android funciona também pela aba.
+
+O agendador roda no próprio processo do backend: a cada minuto ele recalcula o
+dia de quem tem aparelho assinado e dispara o aviso que acabou de vencer. Não há
+fila de agendamentos — editar um ponto, mudar a jornada ou marcar um feriado já
+valem no minuto seguinte.
+
 ## Dados e backup
 
 Tudo vive em `./data/timetracker.db`, ignorado pelo git. Inclua esse diretório na
@@ -194,11 +265,16 @@ server/
   time.js           conversão de fuso e cálculo de tempo trabalhado
   summary.js        resumo por dia, previsto e saldo acumulado
   auth.js           cadastro, login, JWT
-  routes/           punches, reports, settings, overrides
-web/src/
-  pages/            Dashboard, Week, History, DayEditor, Settings, Login
-  api.ts            cliente HTTP e tipos compartilhados
-  offline.ts        fila de pontos e retrato do dia para uso sem conexão
+  push.js           chaves VAPID e envio de Web Push
+  notify.js         agendador dos avisos (roda a cada minuto)
+  invites.js        convites: cota, validade e consumo
+  routes/           punches, reports, settings, overrides, push, invites, admin
+web/
+  public/push-sw.js handlers de push anexados ao service worker do Workbox
+  src/pages/        Dashboard, Week, History, DayEditor, Settings, Users, Login
+  src/api.ts        cliente HTTP e tipos compartilhados
+  src/offline.ts    fila de pontos e retrato do dia para uso sem conexão
+  src/push.ts       assinatura de notificações do aparelho
 ```
 
 ### API
@@ -218,10 +294,19 @@ Todas as rotas exigem o cookie de sessão, exceto cadastro e login.
 | `GET` | `/api/reports/range?from=&to=` | Intervalo arbitrário |
 | `GET` | `/api/reports/total` | Saldo acumulado |
 | `GET` | `/api/reports/export.csv?from=&to=` | Exportação CSV |
+| `PATCH` | `/api/auth/me` | Altera o nome de exibição (o nome de usuário não muda) |
 | `GET` | `/api/settings` · `PUT` | Jornada, tolerância, intervalo mínimo, fuso, início da semana |
 | `GET` | `/api/overrides?from=&to=` | Exceções de jornada |
 | `PUT` | `/api/overrides/:date` | Define feriado/férias/atestado/folga/especial |
 | `DELETE` | `/api/overrides/:date` | Remove a exceção |
+| `GET` | `/api/push/config` | Chave pública VAPID (dispensa sessão) |
+| `POST` | `/api/push/subscribe` · `/unsubscribe` | Liga/desliga os avisos neste aparelho |
+| `POST` | `/api/push/test` | Dispara um aviso de teste |
+| `GET` | `/api/invites` · `POST` · `DELETE /:id` | Meus convites: cota, gerar, revogar |
+| `GET` | `/api/admin/users` | Lista de usuários (só admin master) |
+| `PATCH` | `/api/admin/users/:id` | Cota de convites e nível de acesso |
+| `POST` | `/api/admin/users/:id/password` | Redefine a senha de um usuário |
+| `DELETE` | `/api/admin/users/:id` | Exclui a conta e tudo que é dela |
 
 ## Licença
 

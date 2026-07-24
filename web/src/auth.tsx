@@ -1,6 +1,7 @@
 import { createContext, useContext, useEffect, useState, ReactNode } from 'react';
 import { api, ApiError, Settings, User } from './api';
 import { cacheSettings, cacheUser, getCachedUser, isNetworkError } from './offline';
+import { cancelar as cancelarPush } from './push';
 
 type AuthCtx = {
   user: User | null;
@@ -10,6 +11,8 @@ type AuthCtx = {
   login: (username: string, password: string) => Promise<void>;
   register: (name: string, username: string, password: string, code: string) => Promise<void>;
   logout: () => Promise<void>;
+  /** Reflete na tela um dado do usuário que mudou (hoje, o nome). */
+  atualizar: (u: User) => void;
 };
 
 const Ctx = createContext<AuthCtx>(null!);
@@ -82,6 +85,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     entrar(await api.post<User>('/api/auth/register', { name, username, password, code }));
   };
   const logout = async () => {
+    // Antes de derrubar a sessão: senão o aparelho seguiria recebendo os avisos
+    // de quem saiu — inclusive se outra pessoa entrar depois neste telefone.
+    await cancelarPush().catch(() => {});
     try {
       await api.post('/api/auth/logout');
     } catch (e) {
@@ -94,8 +100,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setOffline(false);
   };
 
+  const atualizar = (u: User) => {
+    setUser(u);
+    cacheUser(u);
+  };
+
   return (
-    <Ctx.Provider value={{ user, loading, offline, login, register, logout }}>{children}</Ctx.Provider>
+    <Ctx.Provider value={{ user, loading, offline, login, register, logout, atualizar }}>
+      {children}
+    </Ctx.Provider>
   );
 }
 

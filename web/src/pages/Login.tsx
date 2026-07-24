@@ -1,19 +1,29 @@
 import { FormEvent, useState } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { useAuth } from '../auth';
 
 export default function Login() {
   const { login, register } = useAuth();
-  const [mode, setMode] = useState<'login' | 'register'>('login');
+  // Link de convite (…/?convite=CÓDIGO): já abre em "Criar conta" com o código
+  // preenchido, então quem foi convidado só escolhe nome de usuário e senha.
+  const [params] = useSearchParams();
+  const convite = params.get('convite')?.trim() || '';
+  const [mode, setMode] = useState<'login' | 'register'>(convite ? 'register' : 'login');
   const [name, setName] = useState('');
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
-  const [code, setCode] = useState('');
+  const [confirma, setConfirma] = useState('');
+  const [code, setCode] = useState(convite);
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
 
   async function submit(e: FormEvent) {
     e.preventDefault();
     setError('');
+    if (mode === 'register' && password !== confirma) {
+      setError('As senhas não conferem.');
+      return;
+    }
     setBusy(true);
     try {
       if (mode === 'login') await login(username.trim(), password);
@@ -68,12 +78,30 @@ export default function Login() {
               onChange={(e) => setPassword(e.target.value)}
               required
               autoComplete={mode === 'login' ? 'current-password' : 'new-password'}
+              minLength={mode === 'register' ? 6 : undefined}
             />
           </label>
           {mode === 'register' && (
             <label>
-              Código de cadastro
+              Confirmar senha
+              <input
+                type="password"
+                value={confirma}
+                onChange={(e) => setConfirma(e.target.value)}
+                required
+                autoComplete="new-password"
+              />
+            </label>
+          )}
+          {mode === 'register' && (
+            <label>
+              Código de convite
               <input value={code} onChange={(e) => setCode(e.target.value)} required />
+              <span className="muted small">
+                {convite
+                  ? 'Veio do seu link de convite — é só criar a conta.'
+                  : 'Peça a quem já usa o app, ou use o código de administrador da instância.'}
+              </span>
             </label>
           )}
 

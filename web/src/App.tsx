@@ -1,12 +1,15 @@
+import { useEffect } from 'react';
 import { Navigate, NavLink, Route, Routes } from 'react-router-dom';
 import { useAuth } from './auth';
 import InstallBanner from './install';
+import { sincronizar as sincronizarPush } from './push';
 import Login from './pages/Login';
 import Dashboard from './pages/Dashboard';
 import Week from './pages/Week';
 import History from './pages/History';
 import DayEditor from './pages/DayEditor';
 import Settings from './pages/Settings';
+import Users from './pages/Users';
 
 function BottomNav() {
   const items = [
@@ -30,6 +33,12 @@ function BottomNav() {
 export default function App() {
   const { user, loading } = useAuth();
 
+  // O aparelho já assinado reapresenta sua assinatura ao servidor a cada
+  // abertura: o navegador pode ter trocado o endereço dela por conta própria.
+  useEffect(() => {
+    if (user) sincronizarPush();
+  }, [user]);
+
   if (loading) {
     return (
       <div className="center-screen">
@@ -50,6 +59,9 @@ export default function App() {
           <Route path="/historico" element={<History />} />
           <Route path="/dia/:date" element={<DayEditor />} />
           <Route path="/config" element={<Settings />} />
+          {/* Fora da BottomNav: são 4 itens no celular e o acesso é raro —
+              o caminho é o card de administração em Ajustes. */}
+          <Route path="/usuarios" element={<Users />} />
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
       </main>

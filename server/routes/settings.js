@@ -21,6 +21,9 @@ function fusoValido(tz) {
   }
 }
 
+/** Liga/desliga como o SQLite guarda: 0 ou 1. */
+const liga = z.union([z.literal(0), z.literal(1)]);
+
 const daySchema = z.object({
   expected: z.number().int().min(0).max(1440),
   break: z.number().int().min(0).max(1440),
@@ -33,6 +36,11 @@ router.put('/', (req, res) => {
     week_start: z.union([z.literal(0), z.literal(1)]),
     // 0 = sem checagem de intervalo mínimo
     min_break_minutes: z.number().int().min(0).max(480).optional(),
+    // Avisos push. Opcionais e no mesmo 0/1 que o GET devolve, para o app poder
+    // reenviar o objeto inteiro que recebeu.
+    notify_end_of_day: liga.optional(),
+    notify_end_lead_minutes: z.number().int().min(0).max(120).optional(),
+    notify_break_done: liga.optional(),
     schedule: z.record(z.string(), daySchema),
   });
   const parsed = schema.safeParse(req.body);
@@ -40,18 +48,27 @@ router.put('/', (req, res) => {
 
   const { tolerance_minutes, timezone, week_start, schedule } = parsed.data;
   const minBreak = parsed.data.min_break_minutes ?? DEFAULT_MIN_BREAK;
+  // Campo ausente mantém o que já estava salvo.
+  const atual = getSettings(req.user.id);
+  const manter = (v, antes) => (v === undefined ? (antes ? 1 : 0) : v);
+
   db.prepare(
-    `INSERT INTO settings (user_id, tolerance_minutes, timezone, week_start, min_break_minutes, schedule)
-     VALUES (@uid, @tol, @tz, @ws, @minb, @sch)
+    `INSERT INTO settings (user_id, tolerance_minutes, timezone, week_start, min_break_minutes,
+                           notify_end_of_day, notify_end_lead_minutes, notify_break_done, schedule)
+     VALUES (@uid, @tol, @tz, @ws, @minb, @nEnd, @nLead, @nBreak, @sch)
      ON CONFLICT(user_id) DO UPDATE SET
        tolerance_minutes = @tol, timezone = @tz, week_start = @ws,
-       min_break_minutes = @minb, schedule = @sch`
+       min_break_minutes = @minb, notify_end_of_day = @nEnd,
+       notify_end_lead_minutes = @nLead, notify_break_done = @nBreak, schedule = @sch`
   ).run({
     uid: req.user.id,
     tol: tolerance_minutes,
     tz: timezone,
     ws: week_start,
     minb: minBreak,
+    nEnd: manter(parsed.data.notify_end_of_day, atual.notify_end_of_day),
+    nLead: parsed.data.notify_end_lead_minutes ?? atual.notify_end_lead_minutes,
+    nBreak: manter(parsed.data.notify_break_done, atual.notify_break_done),
     sch: JSON.stringify(schedule),
   });
   res.json(getSettings(req.user.id));
