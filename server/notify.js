@@ -49,26 +49,29 @@ function gatilhos(userId, nowIso) {
   }
 
   // ── Intervalo mínimo cumprido ─────────────────────────────────────────────
-  // Saiu no meio da jornada (sessão fechada, previsto ainda não cumprido) e o
-  // intervalo em andamento acabou de atingir o mínimo.
+  // Cada saída (índice ímpar por posição) abre um intervalo que fecha na
+  // entrada seguinte, ou segue em andamento até agora se for a última. Olhamos
+  // todos os intervalos do dia, não só o em andamento: quem volta bem na hora
+  // do mínimo já fecha a sessão antes do próximo tick de 1 min ver o intervalo
+  // ainda aberto, e sem isso o aviso nunca dispara pra quem não se atrasa.
   const minimo = settings.min_break_minutes;
-  const ultimo = [...dia.punches].sort((a, b) => a.ts.localeCompare(b.ts)).pop();
-  if (
-    settings.notify_break_done &&
-    minimo > 0 &&
-    ultimo &&
-    !dia.open &&
-    dia.expectedMinutes > 0 &&
-    dia.workedMinutes < dia.expectedMinutes
-  ) {
-    const fora = Math.floor((Date.parse(nowIso) - Date.parse(ultimo.ts)) / 60000);
-    if (fora >= minimo && fora <= TETO_INTERVALO_MIN) {
-      avisos.push({
-        kind: 'break_done',
-        key: ultimo.ts,
-        title: `Intervalo de ${minimo} min cumprido`,
-        body: 'Pode voltar — a entrada agora não gera aviso de intervalo curto.',
-      });
+  const punchesOrdenados = [...dia.punches].sort((a, b) => a.ts.localeCompare(b.ts));
+  if (settings.notify_break_done && minimo > 0 && dia.expectedMinutes > 0 && dia.workedMinutes < dia.expectedMinutes) {
+    for (let i = 1; i < punchesOrdenados.length; i += 2) {
+      const saida = punchesOrdenados[i];
+      const entrada = punchesOrdenados[i + 1]; // ausente = intervalo ainda em andamento
+      const fimGap = entrada ? Date.parse(entrada.ts) : Date.parse(nowIso);
+      const fora = Math.floor((fimGap - Date.parse(saida.ts)) / 60000);
+      if (fora >= minimo && fora <= TETO_INTERVALO_MIN) {
+        avisos.push({
+          kind: 'break_done',
+          key: saida.ts,
+          title: `Intervalo de ${minimo} min cumprido`,
+          body: entrada
+            ? `Intervalo de ${fora} min registrado — dentro do mínimo, sem aviso de intervalo curto.`
+            : 'Pode voltar — a entrada agora não gera aviso de intervalo curto.',
+        });
+      }
     }
   }
 
