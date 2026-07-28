@@ -272,6 +272,50 @@ select {
   color: var(--muted);
 }
 
+/* ─── Menu de categorias (Ajustes) ────────────────────────────────────────── */
+.settings-menu {
+  padding: 4px;
+  gap: 0;
+}
+.settings-menu-item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 14px 8px;
+  border-bottom: 1px solid var(--border);
+  text-decoration: none;
+  color: var(--text);
+}
+.settings-menu-item:last-child {
+  border-bottom: none;
+}
+.settings-menu-icon {
+  font-size: 1.3rem;
+  width: 28px;
+  text-align: center;
+  flex-shrink: 0;
+}
+.settings-menu-text {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.settings-menu-title {
+  font-size: 0.95rem;
+  font-weight: 600;
+}
+.settings-menu-desc {
+  font-size: 0.78rem;
+  color: var(--muted);
+}
+.settings-menu-chevron {
+  color: var(--muted);
+  font-size: 1.2rem;
+  flex-shrink: 0;
+}
+
 /* ─── Lista de pontos ─────────────────────────────────────────────────────── */
 .punch-list {
   list-style: none;

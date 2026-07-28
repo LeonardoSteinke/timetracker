@@ -9,6 +9,12 @@ import Week from './pages/Week';
 import History from './pages/History';
 import DayEditor from './pages/DayEditor';
 import Settings from './pages/Settings';
+import SettingsJornada from './pages/Settings/Jornada';
+import SettingsNotificacoes from './pages/Settings/Notificacoes';
+import SettingsPreferencias from './pages/Settings/Preferencias';
+import SettingsConta from './pages/Settings/Conta';
+import SettingsConvites from './pages/Settings/Convites';
+import SettingsAplicativo from './pages/Settings/Aplicativo';
 import Users from './pages/Users';
 
 function BottomNav() {
@@ -59,8 +65,14 @@ export default function App() {
           <Route path="/historico" element={<History />} />
           <Route path="/dia/:date" element={<DayEditor />} />
           <Route path="/config" element={<Settings />} />
+          <Route path="/config/jornada" element={<SettingsJornada />} />
+          <Route path="/config/notificacoes" element={<SettingsNotificacoes />} />
+          <Route path="/config/preferencias" element={<SettingsPreferencias />} />
+          <Route path="/config/conta" element={<SettingsConta />} />
+          <Route path="/config/convites" element={<SettingsConvites />} />
+          <Route path="/config/aplicativo" element={<SettingsAplicativo />} />
           {/* Fora da BottomNav: são 4 itens no celular e o acesso é raro —
-              o caminho é o card de administração em Ajustes. */}
+              o caminho é o item de administração em Ajustes. */}
           <Route path="/usuarios" element={<Users />} />
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
