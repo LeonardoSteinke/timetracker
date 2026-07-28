@@ -23,6 +23,7 @@ import {
   horaNoFuso,
   isoFromLocal,
   noMinutoCheio,
+  remainingWithBreak,
 } from '../util';
 
 type LiveState = 'off' | 'working';
@@ -168,6 +169,8 @@ export default function Dashboard() {
   // Intervalo mínimo configurado nos Ajustes. Retrato antigo do cache offline
   // pode não trazer o campo — aí vale o padrão de 30 min.
   const minimoIntervalo = data?.minBreakMinutes ?? 30;
+  // Idem para a flag de considerar esse mínimo na previsão de saída.
+  const considerarIntervaloNaPrevisao = data?.predictMinBreak ?? true;
 
   /** Abre a confirmação já com a hora de agora — é só confirmar no caso normal. */
   function ask(kind: PunchKind) {
@@ -236,7 +239,6 @@ export default function Dashboard() {
   const live = liveCompute(punches, now);
   const workedMin = live.workedSec / 60;
   const expected = view.today.expectedMinutes;
-  const remaining = Math.max(0, expected - workedMin);
   // Saiu no meio da jornada → está no intervalo, e ele já conta a partir de
   // agora. Depois de cumprir o previsto a saída é fim de expediente, não
   // intervalo — aí o contador não roda mais. Passando do teto, também não:
@@ -251,9 +253,19 @@ export default function Dashboard() {
   const intervaloSec = live.breakSec + (noIntervalo ? live.abertoSec : 0);
   const faltaIntervalo = Math.max(0, minimoIntervalo - live.abertoSec / 60);
   const dayBalance = workedMin - expected;
+  // Quanto falta para a jornada fechar a partir de agora. Com a flag ligada,
+  // quem ainda não completou o intervalo mínimo vê esse tempo somado — o
+  // intervalo vai acontecer de qualquer jeito, e nunca pode ser mais curto que
+  // o mínimo, então a previsão não pode contar menos do que ele.
+  const remaining = remainingWithBreak(
+    workedMin,
+    expected,
+    intervaloSec / 60,
+    minimoIntervalo,
+    considerarIntervaloNaPrevisao
+  );
   // Horário em que a jornada fecha se o dia seguir a partir de agora — enquanto
-  // está no intervalo a previsão vai empurrando junto. O quanto falta em minutos
-  // já é o saldo do dia com o sinal trocado, então não vale um espaço na tela.
+  // está no intervalo a previsão vai empurrando junto.
   const saidaPrevista =
     punches.length > 0 && expected > 0 && remaining > 0
       ? horaNoFuso(new Date(now + remaining * 60000).toISOString(), view.timezone)

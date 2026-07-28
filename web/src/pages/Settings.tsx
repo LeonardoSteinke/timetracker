@@ -199,6 +199,18 @@ export default function Settings() {
           />
           <span>minutos</span>
         </div>
+        <label className="check-row">
+          <input
+            type="checkbox"
+            checked={!!s.predict_min_break}
+            onChange={(e) => setS({ ...s, predict_min_break: e.target.checked ? 1 : 0 })}
+          />
+          <span>Somar o intervalo mínimo ainda não cumprido na saída prevista</span>
+        </label>
+        <p className="muted small">
+          Antes de bater o intervalo (ou enquanto ele for menor que o mínimo), a saída prevista
+          empurra junto — já que ele não pode ser mais curto que isso.
+        </p>
       </section>
 
       <NotificationsCard s={s} onChange={setS} />

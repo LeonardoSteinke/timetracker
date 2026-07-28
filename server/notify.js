@@ -10,7 +10,7 @@
 import db from './db.js';
 import { pushHabilitado, enviar } from './push.js';
 import { getSettings, rangeSummaries } from './summary.js';
-import { localDateKey, localTimeKey, fmtMinutes } from './time.js';
+import { localDateKey, localTimeKey, fmtMinutes, remainingWithBreak } from './time.js';
 
 /**
  * Acima disso quem está fora não está no almoço — foi embora. Mesmo teto que o
@@ -33,7 +33,15 @@ function gatilhos(userId, nowIso) {
   // lembrado de bater a saída. Feriado/férias zeram o previsto e não disparam.
   if (settings.notify_end_of_day && dia.expectedMinutes > 0 && dia.open) {
     const lead = settings.notify_end_lead_minutes || 0;
-    const falta = dia.expectedMinutes - dia.workedMinutes;
+    // Sessão aberta (dia.open) é trabalho em andamento, não intervalo — o que
+    // já foi cumprido de intervalo hoje é só o `breakMinutes` fechado mesmo.
+    const falta = remainingWithBreak(
+      dia.workedMinutes,
+      dia.expectedMinutes,
+      dia.breakMinutes,
+      settings.min_break_minutes,
+      settings.predict_min_break
+    );
     if (falta <= lead) {
       const saida = localTimeKey(new Date(Date.parse(nowIso) + falta * 60000).toISOString(), settings.timezone);
       avisos.push({

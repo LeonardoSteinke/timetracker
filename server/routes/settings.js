@@ -36,6 +36,8 @@ router.put('/', (req, res) => {
     week_start: z.union([z.literal(0), z.literal(1)]),
     // 0 = sem checagem de intervalo mínimo
     min_break_minutes: z.number().int().min(0).max(480).optional(),
+    // Considera o intervalo mínimo ainda não cumprido na previsão de saída.
+    predict_min_break: liga.optional(),
     // Avisos push. Opcionais e no mesmo 0/1 que o GET devolve, para o app poder
     // reenviar o objeto inteiro que recebeu.
     notify_end_of_day: liga.optional(),
@@ -54,11 +56,12 @@ router.put('/', (req, res) => {
 
   db.prepare(
     `INSERT INTO settings (user_id, tolerance_minutes, timezone, week_start, min_break_minutes,
-                           notify_end_of_day, notify_end_lead_minutes, notify_break_done, schedule)
-     VALUES (@uid, @tol, @tz, @ws, @minb, @nEnd, @nLead, @nBreak, @sch)
+                           predict_min_break, notify_end_of_day, notify_end_lead_minutes,
+                           notify_break_done, schedule)
+     VALUES (@uid, @tol, @tz, @ws, @minb, @predb, @nEnd, @nLead, @nBreak, @sch)
      ON CONFLICT(user_id) DO UPDATE SET
        tolerance_minutes = @tol, timezone = @tz, week_start = @ws,
-       min_break_minutes = @minb, notify_end_of_day = @nEnd,
+       min_break_minutes = @minb, predict_min_break = @predb, notify_end_of_day = @nEnd,
        notify_end_lead_minutes = @nLead, notify_break_done = @nBreak, schedule = @sch`
   ).run({
     uid: req.user.id,
@@ -66,6 +69,7 @@ router.put('/', (req, res) => {
     tz: timezone,
     ws: week_start,
     minb: minBreak,
+    predb: manter(parsed.data.predict_min_break, atual.predict_min_break),
     nEnd: manter(parsed.data.notify_end_of_day, atual.notify_end_of_day),
     nLead: parsed.data.notify_end_lead_minutes ?? atual.notify_end_lead_minutes,
     nBreak: manter(parsed.data.notify_break_done, atual.notify_break_done),

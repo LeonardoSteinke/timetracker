@@ -104,6 +104,28 @@ export function noMinutoCheio(iso: string): string {
   return d.toISOString();
 }
 
+/**
+ * Minutos que faltam para a jornada fechar, a partir de agora. Sem considerar
+ * o intervalo mínimo é só o trabalho que falta (`expected - worked`). Como a
+ * lei não permite um intervalo mais curto que o mínimo, quem ainda não
+ * completou esse intervalo (breakSoFar < minBreakMinutes) tem a diferença
+ * somada — o intervalo vai acontecer de qualquer jeito, e a previsão de saída
+ * empurra junto até o mínimo ser cumprido. Mesma regra do `remainingWithBreak`
+ * do servidor (server/time.js).
+ */
+export function remainingWithBreak(
+  workedMinutes: number,
+  expectedMinutes: number,
+  breakSoFarMinutes: number,
+  minBreakMinutes: number,
+  considerarIntervalo: boolean
+): number {
+  const trabalho = Math.max(0, expectedMinutes - workedMinutes);
+  if (!considerarIntervalo || !minBreakMinutes) return trabalho;
+  const faltaIntervalo = Math.max(0, minBreakMinutes - breakSoFarMinutes);
+  return trabalho + faltaIntervalo;
+}
+
 export function fmtDataCurta(dateKey: string): string {
   return dayjs(dateKey).format('DD/MM');
 }

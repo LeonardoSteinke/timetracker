@@ -138,6 +138,21 @@ export function dayBalance(workedMinutes, expectedMinutes, toleranceMinutes) {
   return { raw, effective };
 }
 
+/**
+ * Minutos que faltam para a jornada fechar, a partir de agora. Sem considerar
+ * o intervalo mínimo é só o trabalho que falta (`expected - worked`). Como a
+ * lei não permite um intervalo mais curto que o mínimo, quem ainda não
+ * completou esse intervalo (breakSoFar < minBreakMinutes) tem a diferença
+ * somada — o intervalo vai acontecer de qualquer jeito, e a previsão de saída
+ * empurra junto até o mínimo ser cumprido.
+ */
+export function remainingWithBreak(workedMinutes, expectedMinutes, breakSoFarMinutes, minBreakMinutes, considerarIntervalo) {
+  const trabalho = Math.max(0, expectedMinutes - workedMinutes);
+  if (!considerarIntervalo || !minBreakMinutes) return trabalho;
+  const faltaIntervalo = Math.max(0, minBreakMinutes - breakSoFarMinutes);
+  return trabalho + faltaIntervalo;
+}
+
 /** Formata minutos (com sinal opcional) como "1h30" / "-0h45". */
 export function fmtMinutes(min, signed = false) {
   const sign = min < 0 ? '-' : signed ? '+' : '';

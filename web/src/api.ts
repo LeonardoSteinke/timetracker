@@ -122,6 +122,8 @@ export type TodayResponse = {
   timezone: string;
   /** Intervalo mínimo configurado (minutos); 0 = sem checagem. */
   minBreakMinutes: number;
+  /** Se a previsão de saída soma o intervalo mínimo ainda não cumprido. */
+  predictMinBreak: boolean;
 };
 
 export type DayConfig = { expected: number; break: number };
@@ -131,6 +133,8 @@ export type Settings = {
   week_start: 0 | 1;
   /** Intervalo mínimo entre uma saída e a entrada seguinte; 0 = sem checagem. */
   min_break_minutes: number;
+  /** Soma o intervalo mínimo ainda não cumprido na previsão de saída (0/1). */
+  predict_min_break: 0 | 1;
   /** Avisos push (0/1 como o SQLite guarda). */
   notify_end_of_day: 0 | 1;
   /** Minutos de antecedência do aviso de fim de jornada; 0 = na hora. */

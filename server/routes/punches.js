@@ -69,6 +69,8 @@ router.get('/today', (req, res) => {
     timezone: settings.timezone,
     // o app precisa do mínimo para avisar do intervalo curto mesmo offline
     minBreakMinutes: settings.min_break_minutes,
+    // se a previsão de saída deve somar o intervalo mínimo ainda não cumprido
+    predictMinBreak: !!settings.predict_min_break,
   });
 });
 

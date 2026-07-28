@@ -10,6 +10,7 @@ export function getSettings(userId) {
       timezone: process.env.TZ || 'America/Sao_Paulo',
       week_start: 1,
       min_break_minutes: DEFAULT_MIN_BREAK,
+      predict_min_break: 1,
       ...NOTIFY_DEFAULTS,
       schedule: DEFAULT_SCHEDULE,
     };

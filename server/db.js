@@ -130,6 +130,16 @@ if (!settingsCols.includes('min_break_minutes')) {
   db.exec('ALTER TABLE settings ADD COLUMN min_break_minutes INTEGER NOT NULL DEFAULT 30');
 }
 
+// ── predict_min_break: considera o intervalo mínimo ainda não cumprido na
+// previsão de saída ──────────────────────────────────────────────────────────
+// Sem isso a previsão só soma o trabalho que falta, como se o intervalo já
+// tivesse acontecido. Ligado por padrão: quem ainda não bateu (ou não
+// completou) o intervalo mínimo vê esse tempo somado à previsão, porque a lei
+// não permite um intervalo mais curto que ele.
+if (!settingsCols.includes('predict_min_break')) {
+  db.exec('ALTER TABLE settings ADD COLUMN predict_min_break INTEGER NOT NULL DEFAULT 1');
+}
+
 // ── Preferências de notificação ──────────────────────────────────────────────
 // Quais avisos o usuário quer receber. Ligados por padrão: quem não assinar o
 // push em nenhum aparelho não recebe nada de qualquer jeito.
