@@ -31,7 +31,10 @@ configurado (30 min por padrão).
 **Semana** — trabalhado × previsto por dia em barras comparativas, saldo diário e
 total da semana, com navegação entre semanas.
 
-**Histórico** — 7, 30 ou 90 dias, com o saldo acumulado do banco de horas.
+**Histórico** — calendário mensal e saldo acumulado do banco de horas. O saldo
+conta todos os dias com jornada prevista desde o primeiro ponto, mesmo quando
+faltou registro; feriados, férias, atestados, folgas e jornadas especiais
+ajustam o previsto desses dias.
 
 **Editar dias passados** — esqueceu de bater o ponto? Toque em qualquer dia na
 Semana ou no Histórico para abrir a edição: adicionar, corrigir horário ou tipo,

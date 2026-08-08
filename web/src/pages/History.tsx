@@ -5,7 +5,7 @@ import { fmtMin, fmtSigned, WEEKDAYS, fmtDataLonga, dayjs, OVERRIDE_LABEL } from
 
 const OVERRIDE_KINDS: OverrideKind[] = ['vacation', 'dayoff', 'holiday', 'sick', 'custom'];
 
-type Totais = { worked: number; expected: number; balance: number };
+type Totais = { worked: number; expected: number };
 
 /** Totais de um conjunto de dias (o /range só devolve o do período inteiro). */
 function sumDays(days: DaySummary[]): Totais {
@@ -13,18 +13,28 @@ function sumDays(days: DaySummary[]): Totais {
     (a, d) => ({
       worked: a.worked + d.workedMinutes,
       expected: a.expected + d.expectedMinutes,
-      balance: a.balance + d.balance,
     }),
-    { worked: 0, expected: 0, balance: 0 }
+    { worked: 0, expected: 0 }
   );
 }
 
 export default function History() {
   const [total, setTotal] = useState<number | null>(null);
 
-  useEffect(() => {
+  const loadTotal = useCallback(() => {
     api.get<{ totalBalance: number }>('/api/reports/total').then((r) => setTotal(r.totalBalance));
   }, []);
+
+  useEffect(() => {
+    loadTotal();
+    const timer = window.setInterval(loadTotal, 60_000);
+    const visible = () => document.visibilityState === 'visible' && loadTotal();
+    document.addEventListener('visibilitychange', visible);
+    return () => {
+      window.clearInterval(timer);
+      document.removeEventListener('visibilitychange', visible);
+    };
+  }, [loadTotal]);
 
   return (
     <div className="page">
@@ -39,15 +49,15 @@ export default function History() {
         </span>
       </section>
 
-      <CalendarView />
+      <CalendarView onBalanceChanged={loadTotal} />
     </div>
   );
 }
 
-/** Trabalhado / previsto / saldo do mês exibido. */
+/** Trabalhado / previsto do mês exibido; o saldo é sempre o acumulado acima. */
 function Totals({ totals, context }: { totals: Totais; context: string }) {
   return (
-    <section className="week-totals card" aria-label={`Resumo ${context}`}>
+    <section className="week-totals two-totals card" aria-label={`Horas ${context}`}>
       <div>
         <span className="mini-value">{fmtMin(totals.worked)}</span>
         <span className="mini-label">trabalhado</span>
@@ -55,10 +65,6 @@ function Totals({ totals, context }: { totals: Totais; context: string }) {
       <div>
         <span className="mini-value">{fmtMin(totals.expected)}</span>
         <span className="mini-label">previsto</span>
-      </div>
-      <div>
-        <span className={`mini-value ${totals.balance >= 0 ? 'pos' : 'neg'}`}>{fmtSigned(totals.balance)}</span>
-        <span className="mini-label">saldo</span>
       </div>
     </section>
   );
@@ -213,7 +219,7 @@ function PeriodOverride({ defaultFrom, onDone }: { defaultFrom: string; onDone: 
 
 // ─── Calendário: grade do mês ─────────────────────────────────────────────────
 
-function CalendarView() {
+function CalendarView({ onBalanceChanged }: { onBalanceChanged: () => void }) {
   const [month, setMonth] = useState(() => dayjs().startOf('month'));
   const [weekStart, setWeekStart] = useState<0 | 1>(1);
   const [days, setDays] = useState<Record<string, DaySummary> | null>(null);
@@ -318,7 +324,7 @@ function CalendarView() {
               <i className="sw flag" /> exceção
             </span>
           </div>
-          <PeriodOverride defaultFrom={today} onDone={load} />
+          <PeriodOverride defaultFrom={today} onDone={() => { load(); onBalanceChanged(); }} />
           <a className="btn-secondary export-btn" href={`/api/reports/export.csv?from=${monthFrom}&to=${monthTo}`}>
             ⤓ Exportar CSV ({month.format('MMMM')})
           </a>

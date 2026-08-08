@@ -19,7 +19,7 @@ const {
   shortBreakAround,
 } = await import('../time.js');
 const { normalizeDay } = await import('../normalize.js');
-const { getSettings, rangeSummaries } = await import('../summary.js');
+const { getSettings, rangeSummaries, totalBalance } = await import('../summary.js');
 const { BACKUP_DIR, listBackups, runDailyBackup } = await import('../backup.js');
 const { agoraEmSegundos, novaVersaoSenha, sessionIsCurrent } = await import('../auth.js');
 const { canAdminResetPassword } = await import('../routes/admin.js');
@@ -104,6 +104,21 @@ test('índice client_id impede duplicação da fila offline', () => {
     () => insert.run(userId, '2026-08-04T13:00:00.000Z', 'offline-client-1'),
     /UNIQUE constraint failed/
   );
+});
+
+test('saldo total desconta jornada sem pontos e respeita ocorrências', () => {
+  const userId = db.prepare("INSERT INTO users (name, username, password_hash) VALUES ('Saldo','saldo','x')").run().lastInsertRowid;
+  const schedule = Object.fromEntries(Array.from({ length: 7 }, (_, day) => [day, { expected: 60, break: 0 }]));
+  db.prepare('INSERT INTO settings (user_id, tolerance_minutes, schedule) VALUES (?, 0, ?)')
+    .run(userId, JSON.stringify(schedule));
+  const insert = db.prepare("INSERT INTO punches (user_id, ts, kind) VALUES (?, ?, 'clock_in')");
+  insert.run(userId, '2026-08-03T12:00:00.000Z');
+  insert.run(userId, '2026-08-03T13:00:00.000Z');
+  db.prepare("INSERT INTO day_overrides (user_id, date, kind) VALUES (?, '2026-08-05', 'holiday')").run(userId);
+
+  const result = totalBalance(userId, getSettings(userId), '2026-08-05T15:00:00.000Z');
+  assert.equal(result.totalBalance, -60); // segunda zerada, terça ausente, quarta feriado
+  assert.equal(result.days, 3);
 });
 
 test('backup é consistente e conserva somente os três dias mais recentes', async () => {

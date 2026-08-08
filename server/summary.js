@@ -122,18 +122,16 @@ export function rangeSummaries(userId, fromKey, toKey, settings, nowIso) {
   return days;
 }
 
-/** Saldo total acumulado do banco de horas (todos os dias com registros). */
+/**
+ * Saldo total acumulado do banco de horas, do primeiro ponto até hoje.
+ * Todo dia com jornada prevista entra na conta mesmo sem ponto; uma ocorrência
+ * (feriado, férias, atestado, folga ou jornada especial) altera esse previsto.
+ */
 export function totalBalance(userId, settings, nowIso) {
   const win = activeWindow(userId, settings, nowIso);
   if (!win.start) return { totalBalance: 0, days: 0 };
   const days = rangeSummaries(userId, win.start, win.end, settings, nowIso);
   let total = 0;
-  let counted = 0;
-  for (const d of days) {
-    if (d.punches.length > 0) {
-      total += d.balance;
-      counted++;
-    }
-  }
-  return { totalBalance: total, days: counted };
+  for (const d of days) total += d.balance;
+  return { totalBalance: total, days: days.filter((d) => d.counted).length };
 }
