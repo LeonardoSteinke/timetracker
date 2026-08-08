@@ -373,16 +373,36 @@ select {
   line-height: 1;
 }
 .week-totals {
-  flex-direction: row;
-  justify-content: space-around;
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 0;
+  padding: 10px;
   text-align: center;
+}
+.week-totals > div {
+  min-width: 0;
+  padding: 6px 4px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+}
+.week-totals > div + div {
+  border-left: 1px solid var(--border);
 }
 .week-totals .mini-value {
   color: var(--text);
-  font-size: 1.1rem;
+  max-width: 100%;
+  font-size: clamp(0.9rem, 4.2vw, 1.1rem);
+  line-height: 1.15;
+  white-space: nowrap;
 }
 .week-totals .mini-label {
   color: var(--muted);
+  font-size: 0.66rem;
+  line-height: 1;
+  white-space: nowrap;
 }
 .week-list {
   display: flex;
@@ -1132,7 +1152,7 @@ a.btn-secondary {
 @media (max-width: 350px) {
   .big-clock { font-size: 2.65rem; }
   .clock-card { padding-right: 14px; padding-left: 14px; }
-  .mini-stats, .week-totals { gap: 8px; }
+  .mini-stats { gap: 8px; }
   .mini-stats > div, .week-totals > div { min-width: 0; }
   .mini-value { font-size: 1rem; }
   .mini-label { font-size: 0.62rem; }

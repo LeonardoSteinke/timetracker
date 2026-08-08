@@ -57,9 +57,9 @@ export default function History() {
 }
 
 /** Trabalhado / previsto / saldo — compartilhado pelas duas visões. */
-function Totals({ totals, label }: { totals: Totais; label: string }) {
+function Totals({ totals, context }: { totals: Totais; context: string }) {
   return (
-    <section className="week-totals card">
+    <section className="week-totals card" aria-label={`Resumo ${context}`}>
       <div>
         <span className="mini-value">{fmtMin(totals.worked)}</span>
         <span className="mini-label">trabalhado</span>
@@ -70,7 +70,7 @@ function Totals({ totals, label }: { totals: Totais; label: string }) {
       </div>
       <div>
         <span className={`mini-value ${totals.balance >= 0 ? 'pos' : 'neg'}`}>{fmtSigned(totals.balance)}</span>
-        <span className="mini-label">{label}</span>
+        <span className="mini-label">saldo</span>
       </div>
     </section>
   );
@@ -114,7 +114,7 @@ function ListView() {
         </div>
       ) : (
         <>
-          <Totals totals={report.totals} label="saldo período" />
+          <Totals totals={report.totals} context="do período" />
 
           <section className="hist-list card">
             {[...report.days]
@@ -391,7 +391,7 @@ function CalendarView() {
         </div>
       ) : (
         <>
-          <Totals totals={sumDays(monthDays)} label="saldo do mês" />
+          <Totals totals={sumDays(monthDays)} context="do mês" />
           <div className="cal-legend muted small">
             <span>
               <i className="sw pos" /> saldo positivo

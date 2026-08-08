@@ -43,7 +43,7 @@ export default function Week() {
         </div>
       </header>
 
-      <section className="week-totals card">
+      <section className="week-totals card" aria-label="Resumo da semana">
         <div>
           <span className="mini-value">{fmtMin(report.totals.worked)}</span>
           <span className="mini-label">trabalhado</span>
@@ -56,7 +56,7 @@ export default function Week() {
           <span className={`mini-value ${report.totals.balance >= 0 ? 'pos' : 'neg'}`}>
             {fmtSigned(report.totals.balance)}
           </span>
-          <span className="mini-label">saldo semana</span>
+          <span className="mini-label">saldo</span>
         </div>
       </section>
 
