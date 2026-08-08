@@ -2,19 +2,18 @@ import express from 'express';
 import { z } from 'zod';
 import db from '../db.js';
 import { requireAuth } from '../auth.js';
-import { localDateKey, isoFromLocal, truncMinute, shortBreakAround } from '../time.js';
+import { isDateKey, localDateKey, isoFromLocal, truncMinute, shortBreakAround } from '../time.js';
 import { getSettings, rangeSummaries, totalBalance, addDays } from '../summary.js';
 import { normalizeDay } from '../normalize.js';
 
 const router = express.Router();
 router.use(requireAuth);
 
-const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
 const TIME_RE = /^([01]\d|2[0-3]):[0-5]\d$/;
 
 /** Data+hora locais (edição manual de dias passados) ou ISO direto. */
 const localTimeFields = {
-  date: z.string().regex(DATE_RE).optional(),
+  date: z.string().refine(isDateKey).optional(),
   time: z.string().regex(TIME_RE).optional(),
 };
 

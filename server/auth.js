@@ -28,7 +28,18 @@ function cookieOpts(req) {
 }
 
 function sign(user) {
-  return jwt.sign({ uid: user.id, name: user.name }, JWT_SECRET, { expiresIn: TOKEN_TTL });
+  return jwt.sign(
+    { uid: user.id, name: user.name, pwd: Number(user.password_changed_at) || 0 },
+    JWT_SECRET,
+    { expiresIn: TOKEN_TTL }
+  );
+}
+
+/** Tokens novos carregam a versão exata; tokens antigos usam iat por compatibilidade. */
+export function sessionIsCurrent(payload, user) {
+  const current = Number(user.password_changed_at) || 0;
+  if (payload.pwd !== undefined) return Number(payload.pwd) === current;
+  return current === 0 || Number(payload.iat) > current;
 }
 
 /** Middleware: exige sessão válida; injeta req.user. */
@@ -43,7 +54,7 @@ export function requireAuth(req, res, next) {
     if (!user) return res.status(401).json({ error: 'sessão inválida' });
     // Token emitido antes da última troca de senha não vale mais — é o que faz
     // o reset feito pelo admin realmente expulsar quem estava logado.
-    if (payload.iat < user.password_changed_at) {
+    if (!sessionIsCurrent(payload, user)) {
       return res.status(401).json({ error: 'sessão expirada' });
     }
     req.user = user;
@@ -62,6 +73,11 @@ export function requireAdmin(req, res, next) {
 /** Epoch em segundos, a mesma unidade do `iat` do JWT. */
 export function agoraEmSegundos() {
   return Math.floor(Date.now() / 1000);
+}
+
+/** Versão monotônica mesmo quando duas trocas acontecem dentro do mesmo segundo. */
+export function novaVersaoSenha(atual = 0) {
+  return Math.max(agoraEmSegundos(), Number(atual) + 1);
 }
 
 const loginLimiter = rateLimit({
@@ -143,7 +159,7 @@ router.post('/register', loginLimiter, (req, res) => {
     throw e;
   }
 
-  res.cookie(COOKIE, sign({ id, name }), cookieOpts(req));
+  res.cookie(COOKIE, sign({ id, name, password_changed_at: 0 }), cookieOpts(req));
   res.json({ id, name, username, is_admin: ehMaster ? 1 : 0 });
 });
 
@@ -190,16 +206,16 @@ router.post('/password', requireAuth, (req, res) => {
   const parsed = schema.safeParse(req.body);
   if (!parsed.success) return res.status(400).json({ error: 'dados inválidos' });
 
-  const row = db.prepare('SELECT password_hash FROM users WHERE id = ?').get(req.user.id);
+  const row = db.prepare('SELECT password_hash, password_changed_at FROM users WHERE id = ?').get(req.user.id);
   if (!bcrypt.compareSync(parsed.data.current, row.password_hash)) {
     return res.status(403).json({ error: 'senha atual incorreta' });
   }
   const hash = bcrypt.hashSync(parsed.data.next, 10);
-  const agora = agoraEmSegundos();
+  const agora = novaVersaoSenha(row.password_changed_at);
   db.prepare('UPDATE users SET password_hash = ?, password_changed_at = ? WHERE id = ?')
     .run(hash, agora, req.user.id);
   // As outras sessões caem; esta continua, com um cookie emitido depois da troca.
-  res.cookie(COOKIE, sign(req.user), cookieOpts(req));
+  res.cookie(COOKIE, sign({ ...req.user, password_changed_at: agora }), cookieOpts(req));
   res.json({ ok: true });
 });
 

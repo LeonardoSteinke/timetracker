@@ -234,6 +234,11 @@ valem no minuto seguinte.
 Tudo vive em `./data/timetracker.db`, ignorado pelo git. Inclua esse diretório na
 sua rotina de backup — é o único estado da aplicação.
 
+O servidor cria automaticamente um snapshot consistente por dia em
+`./data/backups/`. São mantidos apenas os três arquivos diários mais recentes;
+a verificação roda ao iniciar e, depois, a cada hora para não depender do
+processo permanecer ligado em um horário exato.
+
 O SQLite roda em modo WAL, então há também `-wal` e `-shm` ao lado. Para uma
 cópia consistente com o container no ar, prefira:
 

@@ -137,7 +137,7 @@ function UserCard({ u, eu, onChanged }: { u: AdminUser; eu: boolean; onChanged: 
       {trocandoSenha ? (
         <div className="inline-field">
           <input
-            type="text"
+            type="password"
             value={senha}
             onChange={(e) => setSenha(e.target.value)}
             placeholder="nova senha (mín. 6)"
@@ -150,23 +150,19 @@ function UserCard({ u, eu, onChanged }: { u: AdminUser; eu: boolean; onChanged: 
             cancelar
           </button>
         </div>
-      ) : (
+      ) : !eu ? (
         <div className="user-actions">
           <button className="link-btn" onClick={() => setTrocandoSenha(true)}>
             Redefinir senha
           </button>
-          {!eu && (
-            <>
-              <button className="link-btn" onClick={alternarMaster} disabled={busy}>
-                {u.is_admin ? 'Tornar comum' : 'Tornar master'}
-              </button>
-              <button className="link-btn danger" onClick={excluir} disabled={busy}>
-                Excluir conta
-              </button>
-            </>
-          )}
+          <button className="link-btn" onClick={alternarMaster} disabled={busy}>
+            {u.is_admin ? 'Tornar comum' : 'Tornar master'}
+          </button>
+          <button className="link-btn danger" onClick={excluir} disabled={busy}>
+            Excluir conta
+          </button>
         </div>
-      )}
+      ) : null}
 
       {erro && <div className="error">{erro}</div>}
       {msg && <div className="success">{msg}</div>}

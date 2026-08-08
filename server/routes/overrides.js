@@ -2,13 +2,13 @@ import express from 'express';
 import { z } from 'zod';
 import db from '../db.js';
 import { requireAuth } from '../auth.js';
-import { weekdayOf } from '../time.js';
+import { isDateKey, weekdayOf } from '../time.js';
 import { getSettings, addDays } from '../summary.js';
 
 const router = express.Router();
 router.use(requireAuth);
 
-const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
+const dateSchema = z.string().refine(isDateKey);
 const KINDS = ['holiday', 'vacation', 'sick', 'dayoff', 'custom'];
 const MAX_RANGE_DAYS = 366;
 
@@ -43,8 +43,8 @@ router.get('/', (req, res) => {
  */
 router.put('/range', (req, res) => {
   const schema = z.object({
-    from: z.string().regex(DATE_RE),
-    to: z.string().regex(DATE_RE),
+    from: dateSchema,
+    to: dateSchema,
     kind: z.enum(KINDS),
     expected: z.number().int().min(0).max(1440).nullable().optional(),
     note: z.string().max(200).nullable().optional(),
@@ -87,7 +87,7 @@ router.put('/range', (req, res) => {
 router.delete('/range', (req, res) => {
   const from = String(req.query.from || '');
   const to = String(req.query.to || '');
-  if (!DATE_RE.test(from) || !DATE_RE.test(to)) return res.status(400).json({ error: 'datas inválidas' });
+  if (!isDateKey(from) || !isDateKey(to)) return res.status(400).json({ error: 'datas inválidas' });
   const info = db
     .prepare('DELETE FROM day_overrides WHERE user_id = ? AND date BETWEEN ? AND ?')
     .run(req.user.id, from, to);
@@ -96,7 +96,7 @@ router.delete('/range', (req, res) => {
 
 /** Cria ou substitui a exceção de um dia. */
 router.put('/:date', (req, res) => {
-  if (!DATE_RE.test(req.params.date)) return res.status(400).json({ error: 'data inválida' });
+  if (!isDateKey(req.params.date)) return res.status(400).json({ error: 'data inválida' });
 
   const schema = z.object({
     kind: z.enum(KINDS),
@@ -123,6 +123,7 @@ router.put('/:date', (req, res) => {
 
 /** Remove a exceção — o dia volta a seguir o schedule semanal. */
 router.delete('/:date', (req, res) => {
+  if (!isDateKey(req.params.date)) return res.status(400).json({ error: 'data inválida' });
   const info = db
     .prepare('DELETE FROM day_overrides WHERE user_id = ? AND date = ?')
     .run(req.user.id, req.params.date);

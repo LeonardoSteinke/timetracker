@@ -17,6 +17,8 @@ const K_FILA = 'tt:outbox';
 const K_HOJE = 'tt:today';
 const K_USER = 'tt:user';
 const K_SETTINGS = 'tt:settings';
+const K_LAST_SYNC = 'tt:last-sync';
+const lastSyncKey = (userId: number) => `${K_LAST_SYNC}:${userId}`;
 
 /** Ponto registrado localmente, ainda não confirmado pelo servidor. */
 export type PontoPendente = {
@@ -53,6 +55,37 @@ export function subscribe(fn: () => void): () => void {
 }
 function avisar() {
   ouvintes.forEach((fn) => fn());
+}
+
+export type SyncStatus = {
+  online: boolean;
+  syncing: boolean;
+  pending: number;
+  lastSyncedAt: string | null;
+  error: string | null;
+};
+
+let syncing = false;
+let syncError: string | null = null;
+const syncListeners = new Set<() => void>();
+
+function notifySync() {
+  syncListeners.forEach((fn) => fn());
+}
+
+export function getSyncStatus(userId: number): SyncStatus {
+  return {
+    online: navigator.onLine,
+    syncing,
+    pending: getFila(userId).length,
+    lastSyncedAt: localStorage.getItem(lastSyncKey(userId)),
+    error: syncError,
+  };
+}
+
+export function subscribeSync(fn: () => void): () => void {
+  syncListeners.add(fn);
+  return () => syncListeners.delete(fn);
 }
 
 /** Falha de rede (fetch rejeitado) e não resposta de erro do servidor. */
@@ -109,6 +142,7 @@ export function getFila(userId?: number): PontoPendente[] {
 function setFila(fila: PontoPendente[]) {
   gravar(K_FILA, fila);
   avisar();
+  notifySync();
 }
 
 function novoId(): string {
@@ -137,6 +171,10 @@ let enviando = false;
 export async function enviarFila(userId: number): Promise<void> {
   if (enviando || !navigator.onLine) return;
   enviando = true;
+  syncing = true;
+  syncError = null;
+  notifySync();
+  let sent = false;
   try {
     for (const p of getFila(userId)) {
       try {
@@ -148,15 +186,28 @@ export async function enviarFila(userId: number): Promise<void> {
           note: p.note || undefined,
           force: p.force || undefined,
         });
+        sent = true;
       } catch (e) {
-        if (isNetworkError(e)) return;
-        if (e instanceof ApiError && (e.status === 401 || e.status >= 500)) return;
+        if (isNetworkError(e)) {
+          syncError = 'Servidor indisponível';
+          return;
+        }
+        if (e instanceof ApiError && (e.status === 401 || e.status >= 500)) {
+          syncError = e.status === 401 ? 'Sessão expirada' : 'Falha no servidor';
+          return;
+        }
       }
       descartar(p.clientId);
     }
   } finally {
     enviando = false;
+    syncing = false;
+    if (sent) {
+      const at = new Date().toISOString();
+      localStorage.setItem(lastSyncKey(userId), at);
+    }
     avisar();
+    notifySync();
   }
 }
 
@@ -194,7 +245,7 @@ export function juntarPendentes(snap: TodayResponse, pendentes: PontoPendente[])
  * tempos. `onSynced` só dispara quando algo saiu da fila, para a tela recarregar
  * os números do servidor.
  */
-export function startSync(userId: number, onSynced: () => void): () => void {
+export function startSync(userId: number, onSynced: () => void = () => {}): () => void {
   let ultimo = getFila(userId).length;
 
   const rodar = async () => {
@@ -225,10 +276,15 @@ export function startSync(userId: number, onSynced: () => void): () => void {
 
 /** Estado de rede reativo, para os avisos na tela. */
 export function subscribeOnline(fn: () => void): () => void {
-  window.addEventListener('online', fn);
-  window.addEventListener('offline', fn);
+  const changed = () => {
+    syncError = navigator.onLine ? null : 'Sem conexão';
+    notifySync();
+    fn();
+  };
+  window.addEventListener('online', changed);
+  window.addEventListener('offline', changed);
   return () => {
-    window.removeEventListener('online', fn);
-    window.removeEventListener('offline', fn);
+    window.removeEventListener('online', changed);
+    window.removeEventListener('offline', changed);
   };
 }

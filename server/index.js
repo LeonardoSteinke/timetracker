@@ -15,6 +15,7 @@ import pushRouter from './routes/push.js';
 import invitesRouter from './routes/invites.js';
 import adminRouter from './routes/admin.js';
 import { startNotifier } from './notify.js';
+import { startBackupScheduler } from './backup.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
@@ -86,4 +87,5 @@ app.get(/^(?!\/api\/).*/, (req, res) => {
 app.listen(PORT, () => {
   console.log(`TimeTracker rodando na porta ${PORT}`);
   startNotifier();
+  startBackupScheduler();
 });

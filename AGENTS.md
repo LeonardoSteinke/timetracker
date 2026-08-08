@@ -24,6 +24,8 @@ O shell reserva espaço para a navegação inferior fixa. A barra considera `env
 - Regras de tempo e fuso: `server/time.js`; instantes são UTC no banco e datas e horas locais são resolvidas no servidor.
 - Cálculo diário/semanal: `server/summary.js`.
 - Rotas ficam em `server/routes/`; notificações em `notify.js` e `push.js`.
+- `server/backup.js` cria um snapshot diário em `data/backups/` e conserva os
+  três dias mais recentes. A pasta não é versionada porque fica dentro de `data/`.
 
 O estado persistente de produção é o SQLite em `data/`. Nunca altere a regra de fuso apenas no cliente: edição de pontos, agrupamento por dia e horário de verão precisam continuar centralizados no servidor.
 
@@ -36,4 +38,6 @@ O estado persistente de produção é o SQLite em `data/`. Nunca altere a regra 
 
 ## Verificação
 
-Antes de concluir mudanças no frontend, rode `cd web && npm run build`. Confira visualmente as larguras de 320, 360, 390 e 560 px e os modos claro/escuro quando mexer em CSS.
+Antes de concluir mudanças, rode `cd server && npm test` e
+`cd web && npm run build`. Confira visualmente as larguras de 320, 360, 390 e
+560 px e os modos claro/escuro quando mexer em CSS.

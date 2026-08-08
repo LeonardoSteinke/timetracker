@@ -10,7 +10,6 @@ import {
   getFila,
   isNetworkError,
   juntarPendentes,
-  startSync,
   subscribe,
   subscribeOnline,
 } from '../offline';
@@ -121,14 +120,14 @@ export default function Dashboard() {
   // Fila local: redesenha quando um ponto entra ou sai dela.
   useEffect(() => {
     if (!user) return;
+    let previous = getFila(user.id).length;
     setFila(getFila(user.id));
-    return subscribe(() => setFila(getFila(user.id)));
-  }, [user]);
-
-  // Volta a rede (ou o app volta ao primeiro plano) → sobe a fila e recarrega.
-  useEffect(() => {
-    if (!user) return;
-    return startSync(user.id, load);
+    return subscribe(() => {
+      const current = getFila(user.id);
+      setFila(current);
+      if (current.length < previous) load();
+      previous = current.length;
+    });
   }, [user, load]);
 
   useEffect(() => {
@@ -235,7 +234,6 @@ export default function Dashboard() {
 
   const view = juntarPendentes(data, fila);
   const punches = view.today.punches;
-  const naFila = fila.length;
   const live = liveCompute(punches, now);
   const workedMin = live.workedSec / 60;
   const expected = view.today.expectedMinutes;
@@ -284,18 +282,6 @@ export default function Dashboard() {
           Sair
         </button>
       </header>
-
-      {(semRede || naFila > 0) && (
-        <div className="offline-bar">
-          {semRede ? '📴 Sem conexão — o ponto é registrado aqui mesmo.' : '🔄 Enviando…'}
-          {naFila > 0 && (
-            <strong>
-              {' '}
-              {naFila} {naFila === 1 ? 'registro aguardando envio' : 'registros aguardando envio'}
-            </strong>
-          )}
-        </div>
-      )}
 
       <section className={`clock-card state-${live.state}`}>
         <div className="status-pill">{STATUS_LABEL[live.state]}</div>

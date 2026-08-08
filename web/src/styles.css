@@ -48,6 +48,8 @@ body {
   background: var(--bg);
   color: var(--text);
   -webkit-font-smoothing: antialiased;
+  -webkit-text-size-adjust: 100%;
+  text-size-adjust: 100%;
   overscroll-behavior-y: none;
 }
 h1,
@@ -133,8 +135,13 @@ select {
   font-weight: 600;
 }
 .nav-icon {
-  font-size: 1.35rem;
-  line-height: 1;
+  width: 23px;
+  height: 23px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.8;
+  stroke-linecap: round;
+  stroke-linejoin: round;
 }
 
 /* ─── Header ──────────────────────────────────────────────────────────────── */
@@ -153,6 +160,7 @@ select {
   color: var(--indigo);
   font-size: 0.9rem;
   padding: 4px 6px;
+  min-height: 44px;
 }
 .link-btn.danger {
   color: var(--muted);
@@ -1058,14 +1066,53 @@ select {
 }
 
 /* ── Modo offline ────────────────────────────────────────────────────────── */
-.offline-bar {
+.sync-status {
+  width: fit-content;
+  max-width: calc(100% - 24px);
+  min-height: 32px;
+  margin: calc(8px + env(safe-area-inset-top)) auto -4px;
+  padding: 5px 10px;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: var(--surface);
+  color: var(--muted);
+  box-shadow: var(--shadow);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  font-size: 0.72rem;
+  line-height: 1.2;
+}
+.sync-status + .page {
+  padding-top: 12px;
+}
+.install-banner + .sync-status {
+  margin-top: 8px;
+}
+.sync-dot {
+  width: 7px;
+  height: 7px;
+  flex: none;
+  border-radius: 50%;
+  background: var(--green);
+}
+.sync-status.is-offline .sync-dot,
+.sync-status.is-pending .sync-dot {
   background: var(--amber);
-  color: #fff;
-  border-radius: 12px;
-  padding: 10px 12px;
-  font-size: 13px;
-  line-height: 1.35;
-  margin-bottom: 12px;
+}
+.sync-status.is-syncing .sync-dot {
+  background: var(--indigo);
+  animation: pulse 1.2s infinite;
+}
+.sync-retry {
+  min-height: 28px;
+  padding: 2px 6px;
+  border: 0;
+  background: transparent;
+  color: var(--indigo);
+  font-size: inherit;
+  font-weight: 700;
 }
 .punch-row.is-pending {
   opacity: 0.72;
@@ -1122,6 +1169,39 @@ a.btn-secondary {
   align-items: center;
   gap: 4px;
   flex-wrap: wrap;
+}
+
+button,
+a,
+input,
+select {
+  -webkit-tap-highlight-color: transparent;
+}
+button:focus-visible,
+a:focus-visible,
+input:focus-visible,
+select:focus-visible {
+  outline: 3px solid var(--indigo);
+  outline: 3px solid color-mix(in srgb, var(--indigo) 45%, transparent);
+  outline-offset: 2px;
+}
+.form input,
+.field input,
+.field select,
+.punch-time-input,
+.add-punch input {
+  min-height: 44px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    scroll-behavior: auto !important;
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
 }
 .user-actions {
   margin-top: 8px;

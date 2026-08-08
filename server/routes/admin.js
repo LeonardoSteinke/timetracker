@@ -4,7 +4,7 @@ import express from 'express';
 import bcrypt from 'bcryptjs';
 import { z } from 'zod';
 import db from '../db.js';
-import { requireAuth, requireAdmin, agoraEmSegundos } from '../auth.js';
+import { requireAuth, requireAdmin, novaVersaoSenha } from '../auth.js';
 import { vagasUsadas } from '../invites.js';
 
 const router = express.Router();
@@ -23,8 +23,10 @@ function totalMasters() {
 }
 
 function usuario(id) {
-  return db.prepare('SELECT id, name, username, is_admin, invite_quota, created_at FROM users WHERE id = ?').get(id);
+  return db.prepare('SELECT id, name, username, is_admin, invite_quota, created_at, password_changed_at FROM users WHERE id = ?').get(id);
 }
+
+export const canAdminResetPassword = (requesterId, targetId) => requesterId !== targetId;
 
 /** Lista com o que a tela de administração mostra de cada um. */
 router.get('/users', (req, res) => {
@@ -84,9 +86,12 @@ router.post('/users/:id/password', (req, res) => {
 
   const alvo = usuario(id.data);
   if (!alvo) return res.status(404).json({ error: 'usuário não encontrado' });
+  if (!canAdminResetPassword(req.user.id, alvo.id)) {
+    return res.status(400).json({ error: 'altere sua própria senha em Ajustes → Conta' });
+  }
 
   db.prepare('UPDATE users SET password_hash = ?, password_changed_at = ? WHERE id = ?')
-    .run(bcrypt.hashSync(body.data.password, 10), agoraEmSegundos(), alvo.id);
+    .run(bcrypt.hashSync(body.data.password, 10), novaVersaoSenha(alvo.password_changed_at), alvo.id);
   res.json({ ok: true });
 });
 
