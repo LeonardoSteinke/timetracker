@@ -40,6 +40,7 @@ html,
 body,
 #root {
   height: 100%;
+  min-width: 0;
 }
 body {
   margin: 0;
@@ -81,13 +82,13 @@ select {
 .app-shell {
   min-height: 100%;
   min-height: 100dvh;
-  display: flex;
-  flex-direction: column;
 }
 .app-main {
-  flex: 1;
+  min-width: 0;
+  padding-bottom: calc(var(--nav-h) + env(safe-area-inset-bottom));
 }
 .page {
+  width: 100%;
   max-width: var(--maxw);
   margin: 0 auto;
   padding: 16px 16px 24px;
@@ -98,8 +99,12 @@ select {
 }
 
 .bottom-nav {
-  position: sticky;
+  position: fixed;
+  left: 50%;
+  transform: translateX(-50%);
   bottom: 0;
+  width: 100%;
+  max-width: var(--maxw);
   height: calc(var(--nav-h) + env(safe-area-inset-bottom));
   padding-bottom: env(safe-area-inset-bottom);
   background: var(--surface);
@@ -108,9 +113,11 @@ select {
   justify-content: space-around;
   align-items: stretch;
   z-index: 50;
+  box-shadow: 0 -1px 8px rgba(15, 23, 42, 0.05);
 }
 .nav-item {
   flex: 1;
+  min-width: 0;
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -508,6 +515,7 @@ select {
 }
 .hist-mid {
   display: flex;
+  min-width: 0;
   gap: 6px;
   align-items: baseline;
   font-variant-numeric: tabular-nums;
@@ -745,6 +753,9 @@ select {
 .punch-row.edit {
   gap: 8px;
 }
+.punch-row.edit .punch-label {
+  min-width: 0;
+}
 .punch-time-input,
 .add-punch input {
   padding: 8px;
@@ -929,6 +940,9 @@ select {
   border-radius: 14px;
   background: var(--surface);
   box-shadow: var(--shadow);
+  width: calc(100% - 32px);
+  max-width: calc(var(--maxw) - 32px);
+  margin: calc(10px + env(safe-area-inset-top)) auto 0;
 }
 .install-icon {
   font-size: 1.4rem;
@@ -1092,4 +1106,38 @@ a.btn-secondary {
 .user-actions {
   margin-top: 8px;
   gap: 10px;
+}
+
+/* ── Celulares estreitos ─────────────────────────────────────────────────── */
+@media (max-width: 420px) {
+  .page { padding-right: 12px; padding-left: 12px; }
+  .install-banner { width: calc(100% - 24px); }
+  .install-text .small { display: none; }
+  .card-title-row, .wd-head { gap: 8px; }
+  .card-title-row > :first-child, .wd-name { min-width: 0; }
+  .hist-row { grid-template-columns: 54px minmax(0, 1fr) auto; gap: 7px; }
+  .hist-mid { flex-wrap: wrap; gap: 2px 5px; }
+  .hist-mid .tag { max-width: 100%; overflow: hidden; text-overflow: ellipsis; }
+  .punch-row.edit { flex-wrap: wrap; }
+  .punch-row.edit .punch-label { flex-basis: calc(100% - 20px); }
+  .punch-row.edit .punch-time-input { flex: 1; min-width: 0; }
+  .add-punch { flex-wrap: wrap; }
+  .add-punch > span { flex-basis: 100%; }
+  .add-punch input { flex: 1; min-width: 0; }
+  .range-row { flex-direction: column; }
+  .inline-field { flex-wrap: wrap; }
+  .inline-field input:not([type='checkbox']) { min-width: 0; max-width: 100%; }
+}
+
+@media (max-width: 350px) {
+  .big-clock { font-size: 2.65rem; }
+  .clock-card { padding-right: 14px; padding-left: 14px; }
+  .mini-stats, .week-totals { gap: 8px; }
+  .mini-stats > div, .week-totals > div { min-width: 0; }
+  .mini-value { font-size: 1rem; }
+  .mini-label { font-size: 0.62rem; }
+  .cal-card { padding: 8px; }
+  .cal-grid { gap: 2px; }
+  .cal-bal { font-size: 0.54rem; }
+  .nav-label { font-size: 0.65rem; }
 }
