@@ -520,39 +520,6 @@ select {
   font-weight: 800;
   font-variant-numeric: tabular-nums;
 }
-.hist-list {
-  gap: 0;
-}
-.hist-row {
-  display: grid;
-  grid-template-columns: 64px 1fr auto;
-  align-items: center;
-  gap: 10px;
-  padding: 11px 0;
-  border-bottom: 1px solid var(--border);
-}
-.hist-row:last-child {
-  border-bottom: none;
-}
-.hist-date {
-  display: flex;
-  flex-direction: column;
-}
-.hist-wd {
-  font-weight: 600;
-}
-.hist-mid {
-  display: flex;
-  min-width: 0;
-  gap: 6px;
-  align-items: baseline;
-  font-variant-numeric: tabular-nums;
-}
-.hist-bal {
-  font-weight: 700;
-  font-variant-numeric: tabular-nums;
-}
-
 /* ─── Configurações ───────────────────────────────────────────────────────── */
 .schedule-grid {
   display: flex;
@@ -711,10 +678,6 @@ select {
   color: var(--indigo);
   box-shadow: var(--shadow);
 }
-.small-seg button {
-  padding: 7px;
-  font-size: 0.85rem;
-}
 .form {
   display: flex;
   flex-direction: column;
@@ -758,14 +721,12 @@ select {
 }
 
 /* ─── Edição de dia / exceções ────────────────────────────────────────────── */
-/* Semana e Histórico viram links para /dia/:date — herdam a cor do texto. */
-.week-day,
-.hist-row {
+/* Os dias da Semana viram links para /dia/:date — herdam a cor do texto. */
+.week-day {
   color: inherit;
   text-decoration: none;
 }
-.week-day:active,
-.hist-row:active {
+.week-day:active {
   opacity: 0.7;
 }
 .tag {
@@ -1215,9 +1176,6 @@ select:focus-visible {
   .install-text .small { display: none; }
   .card-title-row, .wd-head { gap: 8px; }
   .card-title-row > :first-child, .wd-name { min-width: 0; }
-  .hist-row { grid-template-columns: 54px minmax(0, 1fr) auto; gap: 7px; }
-  .hist-mid { flex-wrap: wrap; gap: 2px 5px; }
-  .hist-mid .tag { max-width: 100%; overflow: hidden; text-overflow: ellipsis; }
   .punch-row.edit { flex-wrap: wrap; }
   .punch-row.edit .punch-label { flex-basis: calc(100% - 20px); }
   .punch-row.edit .punch-time-input { flex: 1; min-width: 0; }

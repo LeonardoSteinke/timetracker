@@ -1,12 +1,10 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { api, DaySummary, OverrideKind, RangeReport, Settings } from '../api';
-import { fmtMin, fmtSigned, WEEKDAYS, fmtDataCurta, fmtDataLonga, dayjs, OVERRIDE_LABEL } from '../util';
+import { fmtMin, fmtSigned, WEEKDAYS, fmtDataLonga, dayjs, OVERRIDE_LABEL } from '../util';
 
 const OVERRIDE_KINDS: OverrideKind[] = ['vacation', 'dayoff', 'holiday', 'sick', 'custom'];
 
-type Preset = 7 | 30 | 90;
-type View = 'lista' | 'calendario';
 type Totais = { worked: number; expected: number; balance: number };
 
 /** Totais de um conjunto de dias (o /range só devolve o do período inteiro). */
@@ -22,7 +20,6 @@ function sumDays(days: DaySummary[]): Totais {
 }
 
 export default function History() {
-  const [view, setView] = useState<View>('lista');
   const [total, setTotal] = useState<number | null>(null);
 
   useEffect(() => {
@@ -42,21 +39,12 @@ export default function History() {
         </span>
       </section>
 
-      <div className="segmented">
-        <button className={view === 'lista' ? 'active' : ''} onClick={() => setView('lista')} type="button">
-          Lista
-        </button>
-        <button className={view === 'calendario' ? 'active' : ''} onClick={() => setView('calendario')} type="button">
-          Calendário
-        </button>
-      </div>
-
-      {view === 'lista' ? <ListView /> : <CalendarView />}
+      <CalendarView />
     </div>
   );
 }
 
-/** Trabalhado / previsto / saldo — compartilhado pelas duas visões. */
+/** Trabalhado / previsto / saldo do mês exibido. */
 function Totals({ totals, context }: { totals: Totais; context: string }) {
   return (
     <section className="week-totals card" aria-label={`Resumo ${context}`}>
@@ -73,79 +61,6 @@ function Totals({ totals, context }: { totals: Totais; context: string }) {
         <span className="mini-label">saldo</span>
       </div>
     </section>
-  );
-}
-
-// ─── Visão lista: últimos N dias ─────────────────────────────────────────────
-
-function ListView() {
-  const [preset, setPreset] = useState<Preset>(30);
-  const [report, setReport] = useState<RangeReport | null>(null);
-  const [error, setError] = useState('');
-
-  const range = useMemo(
-    () => ({
-      to: dayjs().format('YYYY-MM-DD'),
-      from: dayjs().subtract(preset - 1, 'day').format('YYYY-MM-DD'),
-    }),
-    [preset]
-  );
-
-  useEffect(() => {
-    api
-      .get<RangeReport>(`/api/reports/range?from=${range.from}&to=${range.to}`)
-      .then(setReport)
-      .catch((e) => setError((e as Error).message));
-  }, [range]);
-
-  return (
-    <>
-      <div className="segmented small-seg">
-        {([7, 30, 90] as Preset[]).map((p) => (
-          <button key={p} className={preset === p ? 'active' : ''} onClick={() => setPreset(p)} type="button">
-            {p} dias
-          </button>
-        ))}
-      </div>
-
-      {!report ? (
-        <div className="center-screen">
-          <div className="spinner" />
-        </div>
-      ) : (
-        <>
-          <Totals totals={report.totals} context="do período" />
-
-          <section className="hist-list card">
-            {[...report.days]
-              .filter((d) => d.punches.length > 0 || d.expectedMinutes > 0 || d.override)
-              .reverse()
-              .map((d) => (
-                <Link key={d.date} to={`/dia/${d.date}`} className="hist-row">
-                  <div className="hist-date">
-                    <span className="hist-wd">{WEEKDAYS[d.weekday]}</span>
-                    <span className="muted small">{fmtDataCurta(d.date)}</span>
-                  </div>
-                  <div className="hist-mid">
-                    <span>{fmtMin(d.workedMinutes)}</span>
-                    <span className="muted small">/ {fmtMin(d.expectedMinutes)}</span>
-                    {d.override && <span className="tag">{OVERRIDE_LABEL[d.override.kind]}</span>}
-                  </div>
-                  <span className={`hist-bal ${d.balance >= 0 ? 'pos' : 'neg'}`}>
-                    {d.expectedMinutes > 0 || d.workedMinutes > 0 ? fmtSigned(d.balance) : '—'}
-                  </span>
-                </Link>
-              ))}
-          </section>
-
-          <a className="btn-secondary export-btn" href={`/api/reports/export.csv?from=${range.from}&to=${range.to}`}>
-            ⤓ Exportar CSV ({preset} dias)
-          </a>
-        </>
-      )}
-
-      {error && <div className="error">{error}</div>}
-    </>
   );
 }
 
@@ -296,7 +211,7 @@ function PeriodOverride({ defaultFrom, onDone }: { defaultFrom: string; onDone: 
   );
 }
 
-// ─── Visão calendário: grade do mês ──────────────────────────────────────────
+// ─── Calendário: grade do mês ─────────────────────────────────────────────────
 
 function CalendarView() {
   const [month, setMonth] = useState(() => dayjs().startOf('month'));
