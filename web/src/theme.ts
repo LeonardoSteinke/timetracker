@@ -48,8 +48,7 @@ export function readTheme(): Theme {
   }
 }
 
-export function applyTheme(theme: Theme, persist = true) {
-  document.documentElement.dataset.theme = theme;
+export async function applyTheme(theme: Theme, persist = true): Promise<void> {
   // O Vite remove o `id` do link ao extrair o CSS no build. Reencontramos a
   // única folha compilada pelo caminho e a marcamos para as próximas trocas.
   const modernStyles = document.querySelector<HTMLLinkElement>(`#${MODERN_STYLESHEET_ID}`)
@@ -57,30 +56,17 @@ export function applyTheme(theme: Theme, persist = true) {
       .find((link) => link.id !== ORIGINAL_STYLESHEET_ID
         && (link.href.includes('/assets/') || link.getAttribute('href') === '/src/styles.css'));
   if (modernStyles) modernStyles.id = MODERN_STYLESHEET_ID;
-  let originalStyles = document.querySelector<HTMLLinkElement>(`#${ORIGINAL_STYLESHEET_ID}`);
-  if (theme === 'original' && !originalStyles) {
-    originalStyles = document.createElement('link');
-    originalStyles.id = ORIGINAL_STYLESHEET_ID;
-    originalStyles.rel = 'stylesheet';
-    originalStyles.href = '/original-theme.css';
-    // O CSS moderno permanece ativo até o clássico terminar de carregar. Isso
-    // evita uma tela sem estilo na primeira visita, mas nunca mistura os dois
-    // sistemas depois que a folha Original está pronta.
-    originalStyles.addEventListener('load', () => {
-      if (document.documentElement.dataset.theme === 'original' && modernStyles) {
-        modernStyles.disabled = true;
-      }
-    }, { once: true });
-    document.head.appendChild(originalStyles);
-  }
-  if (theme === 'original') {
-    if (originalStyles?.sheet && modernStyles) modernStyles.disabled = true;
-    if (originalStyles) originalStyles.disabled = false;
-  } else {
-    if (modernStyles) modernStyles.disabled = false;
-    if (originalStyles) originalStyles.disabled = true;
-  }
-  document.documentElement.style.colorScheme = '';
+  const originalStyles = document.querySelector<HTMLLinkElement>(`#${ORIGINAL_STYLESHEET_ID}`);
+  const root = document.documentElement;
+
+  // As duas folhas bloqueiam o primeiro render e chegam totalmente parseadas.
+  // O React só é montado depois desta função, quando `media` já deixou uma — e
+  // somente uma — ativa. Nas trocas seguintes a operação continua síncrona.
+  if (originalStyles) originalStyles.media = theme === 'original' ? 'all' : 'not all';
+  if (modernStyles) modernStyles.media = theme === 'original' ? 'not all' : 'all';
+  root.dataset.theme = theme;
+  root.style.colorScheme = '';
+  root.style.visibility = '';
   updateThemeColor(theme);
   if (persist) {
     try {
@@ -99,7 +85,7 @@ function updateThemeColor(theme: Theme) {
 }
 
 export function initializeTheme() {
-  applyTheme(readTheme(), false);
+  void applyTheme(readTheme(), false);
   window.matchMedia?.('(prefers-color-scheme: dark)')
     .addEventListener?.('change', () => updateThemeColor(readTheme()));
 }

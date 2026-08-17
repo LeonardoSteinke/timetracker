@@ -5,9 +5,9 @@ import { SettingsHeader } from './shared';
 export default function SettingsTemas() {
   const [selected, setSelected] = useState<Theme>(() => readTheme());
 
-  function choose(theme: Theme) {
+  async function choose(theme: Theme) {
+    await applyTheme(theme);
     setSelected(theme);
-    applyTheme(theme);
   }
 
   return (
@@ -28,7 +28,7 @@ export default function SettingsTemas() {
               role="radio"
               aria-checked={active}
               className={`theme-option theme-preview-${theme}${active ? ' is-active' : ''}`}
-              onClick={() => choose(theme)}
+              onClick={() => void choose(theme)}
             >
               <span className="theme-preview" aria-hidden="true">
                 <span className="theme-preview-top"><i /><i /><i /></span>
