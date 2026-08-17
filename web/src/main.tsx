@@ -4,8 +4,9 @@ import { BrowserRouter } from 'react-router-dom';
 import App from './App';
 import { AuthProvider } from './auth';
 import { startVersionWatch } from './version';
-import './styles.css';
+import { initializeTheme } from './theme';
 
+initializeTheme();
 startVersionWatch();
 
 ReactDOM.createRoot(document.getElementById('root')!).render(

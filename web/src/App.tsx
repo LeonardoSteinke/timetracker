@@ -16,6 +16,7 @@ import SettingsPreferencias from './pages/Settings/Preferencias';
 import SettingsConta from './pages/Settings/Conta';
 import SettingsConvites from './pages/Settings/Convites';
 import SettingsAplicativo from './pages/Settings/Aplicativo';
+import SettingsTemas from './pages/Settings/Temas';
 import Users from './pages/Users';
 
 function BottomNav() {
@@ -27,6 +28,14 @@ function BottomNav() {
   ];
   return (
     <nav className="bottom-nav" aria-label="Navegação principal">
+      <div className="nav-brand" aria-hidden="true">
+        <span className="nav-brand-mark">
+          <i className="nav-brand-hand nav-brand-hand-hour" />
+          <i className="nav-brand-hand nav-brand-hand-minute" />
+          <i className="nav-brand-center" />
+        </span>
+        <span>tempo</span>
+      </div>
       {items.map((it) => (
         <NavLink key={it.to} to={it.to} end={it.to === '/'} className="nav-item">
           <NavIcon name={it.icon} />
@@ -119,6 +128,7 @@ export default function App() {
           <Route path="/config/conta" element={<SettingsConta />} />
           <Route path="/config/convites" element={<SettingsConvites />} />
           <Route path="/config/aplicativo" element={<SettingsAplicativo />} />
+          <Route path="/config/temas" element={<SettingsTemas />} />
           {/* Fora da BottomNav: são 4 itens no celular e o acesso é raro —
               o caminho é o item de administração em Ajustes. */}
           <Route path="/usuarios" element={<Users />} />

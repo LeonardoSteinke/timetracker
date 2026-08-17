@@ -83,7 +83,7 @@ const STATUS_LABEL: Record<LiveState, string> = {
 };
 
 export default function Dashboard() {
-  const { user, logout } = useAuth();
+  const { user } = useAuth();
   const [data, setData] = useState<TodayResponse | null>(null);
   const [now, setNow] = useState(Date.now());
   const [busy, setBusy] = useState(false);
@@ -272,19 +272,18 @@ export default function Dashboard() {
   void tol;
 
   return (
-    <div className="page">
+    <div className="page dashboard-page">
       <header className="page-header">
         <div>
+          <div className="eyebrow">Seu expediente</div>
           <div className="hello">Olá, {user?.name.split(' ')[0]}</div>
           <div className="muted small">{fmtDataLonga(view.today.date)}</div>
         </div>
-        <button className="link-btn" onClick={() => logout()}>
-          Sair
-        </button>
       </header>
 
       <section className={`clock-card state-${live.state}`}>
-        <div className="status-pill">{STATUS_LABEL[live.state]}</div>
+        <div className="clock-face" aria-hidden="true"><span /><span /><span /><span /></div>
+        <div className="status-pill"><i />{STATUS_LABEL[live.state]}</div>
         <div className="big-clock">{fmtClock(live.workedSec)}</div>
         <div className="clock-caption">tempo trabalhado hoje</div>
 
@@ -312,11 +311,11 @@ export default function Dashboard() {
       <section className="actions">
         {live.state === 'off' ? (
           <button className="btn-big btn-in" disabled={busy} onClick={() => ask('clock_in')}>
-            ▶ Registrar entrada
+            <span className="action-symbol" aria-hidden="true">↳</span> Registrar entrada
           </button>
         ) : (
           <button className="btn-big btn-out" disabled={busy} onClick={() => ask('clock_out')}>
-            ⏹ Registrar saída
+            <span className="action-symbol" aria-hidden="true">■</span> Registrar saída
           </button>
         )}
         <p className="muted small center">

@@ -81,11 +81,11 @@ export default function DayEditor() {
 
   return (
     <div className="page">
-      <header className="page-header">
+      <header className="page-header detail-header">
+        <button className="back-button" onClick={() => navigate(-1)} aria-label="Voltar para o histórico">
+          <span aria-hidden="true">←</span> Histórico
+        </button>
         <div>
-          <button className="link-btn" onClick={() => navigate(-1)}>
-            ‹ Voltar
-          </button>
           <div className="hello">{fmtDataLonga(day.date)}</div>
           <div className="muted small">
             {WEEKDAYS_LONG[day.weekday]}

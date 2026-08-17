@@ -37,11 +37,22 @@ export default function Login() {
 
   return (
     <div className="login-screen">
+      <aside className="login-context" aria-hidden="true">
+        <span>TimeTracker / jornada pessoal</span>
+        <h2>Seu trabalho tem ritmo.<br />O registro só acompanha.</h2>
+        <p>Jornada, pausas e saldo em um lugar privado, direto e sem ruído.</p>
+        <i />
+      </aside>
       <div className="login-card">
         <div className="brand">
-          <div className="brand-icon">⏱</div>
-          <h1>TimeTracker</h1>
-          <p className="muted">Banco de horas & registro de ponto</p>
+          <div className="brand-icon" aria-hidden="true">
+            <span className="brand-hand brand-hand-hour" />
+            <span className="brand-hand brand-hand-minute" />
+            <span className="brand-center" />
+          </div>
+          <div className="brand-kicker">Seu tempo. Seus dados.</div>
+          <h1>Time<span>Tracker</span></h1>
+          <p className="muted">Um registro de jornada simples, privado e seu.</p>
         </div>
 
         <div className="segmented">

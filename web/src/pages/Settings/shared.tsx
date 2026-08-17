@@ -34,11 +34,11 @@ export function useSettings() {
 export function SettingsHeader({ title }: { title: string }) {
   const navigate = useNavigate();
   return (
-    <header className="page-header">
-      <h2>{title}</h2>
-      <button className="link-btn" onClick={() => navigate('/config')}>
-        Voltar
+    <header className="page-header detail-header">
+      <button className="back-button" onClick={() => navigate('/config')} aria-label="Voltar para ajustes">
+        <span aria-hidden="true">←</span> Ajustes
       </button>
+      <h2>{title}</h2>
     </header>
   );
 }

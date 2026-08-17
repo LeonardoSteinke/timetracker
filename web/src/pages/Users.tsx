@@ -36,14 +36,14 @@ export default function Users() {
 
   return (
     <div className="page">
-      <header className="page-header">
+      <header className="page-header detail-header">
+        <button className="back-button" onClick={() => navigate('/config')} aria-label="Voltar para ajustes">
+          <span aria-hidden="true">←</span> Ajustes
+        </button>
         <div>
           <h2>Usuários</h2>
           <div className="muted small">{users ? `${users.length} cadastrados` : 'carregando…'}</div>
         </div>
-        <button className="link-btn" onClick={() => navigate('/config')}>
-          Voltar
-        </button>
       </header>
 
       {erro && <div className="error">{erro}</div>}
