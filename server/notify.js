@@ -92,7 +92,11 @@ async function tick() {
   const usuarios = db.prepare('SELECT DISTINCT user_id FROM push_subscriptions').all();
   if (usuarios.length === 0) return;
 
-  const nowIso = new Date().toISOString();
+  // Notificações contam apenas minutos completos, mesmo se o tick atrasar
+  // alguns segundos em relação ao minuto cheio.
+  const agora = new Date();
+  agora.setUTCSeconds(0, 0);
+  const nowIso = agora.toISOString();
   for (const { user_id: uid } of usuarios) {
     try {
       for (const aviso of gatilhos(uid, nowIso)) {
